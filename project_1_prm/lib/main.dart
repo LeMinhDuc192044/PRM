@@ -58,8 +58,10 @@ class _HomePageState extends State<HomePage> {
     var jsonData = jsonDecode(responseString);
 
     setState(() {
-      result = jsonData["content"];
+      result = jsonData["file"];    
     });
+
+    
   }
 
   @override
