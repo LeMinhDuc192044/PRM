@@ -1,46 +1,55 @@
-from fastapi import FastAPI, UploadFile, File
+from fastapi import FastAPI, UploadFile, File, Form
 import fitz
 import shutil
 import os
 
 app = FastAPI()
 
-@app.post("/extract")
-async def extract(file: UploadFile = File(...)):
+VAULT_PATH = r"C:\Users\admin\Desktop\2026\Semester_8\PRM393\Project\PRM\project_1_prm\ObsidianVault"
 
-    # Save uploaded PDF
+@app.post("/extract")
+async def extract(
+    file: UploadFile = File(...),
+    category: str = Form(...)
+):
+
+    # Save uploaded PDF temporarily
     pdf_path = file.filename
 
     with open(pdf_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
 
-    # Open PDF
+    # Read PDF
     doc = fitz.open(pdf_path)
 
     text = ""
 
-    # Extract text
     for page in doc:
         text += page.get_text()
 
-    # Clean unwanted characters
-    text = text.replace("(cid:13)", "")
-    text = text.replace("(cid:80)", "")
-
-    # Create .mmd filename
-    output_file = pdf_path.replace(".pdf", ".mmd")
-
-    # Save .mmd file
-    with open(output_file, "w", encoding="utf-8") as f:
-        f.write(text)
-
-    # Close PDF
     doc.close()
 
-    # Delete uploaded PDF
+    # Create category folder path
+    category_folder = os.path.join(VAULT_PATH, category)
+
+    # Create folder if not exists
+    os.makedirs(category_folder, exist_ok=True)
+
+    # Generate .md filename
+    output_file = file.filename.replace(".pdf", ".md")
+    
+    # Full save path
+    output_path = os.path.join(category_folder, output_file)
+
+    # Save .mmd file
+    with open(output_path, "w", encoding="utf-8") as f:
+        f.write(text)
+
+    # Remove temporary PDF
     os.remove(pdf_path)
 
     return {
-        "message": ".mmd created successfully",
+        "message": "Saved successfully",
+        "category": category,
         "file": output_file
     }
