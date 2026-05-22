@@ -53,3 +53,70 @@ async def extract(
         "category": category,
         "file": output_file
     }
+
+@app.get("/notes")
+async def get_notes():
+
+    notes = []
+
+    categories = [
+        "AI",
+        "ComputerScience",
+        "DataScience"
+    ]
+
+    for category in categories:
+
+        category_path = os.path.join(
+            VAULT_PATH,
+            category
+        )
+
+        if os.path.exists(category_path):
+
+            for file in os.listdir(category_path):
+
+                if file.endswith(".md"):
+
+                    file_path = os.path.join(
+                        category_path,
+                        file
+                    )
+
+                    with open(
+                        file_path,
+                        "r",
+                        encoding="utf-8"
+                    ) as f:
+
+                        content = f.read()
+
+                    notes.append({
+                        "category": category,
+                        "file": file
+                    })
+
+    return notes
+
+@app.get("/read/{category}/{filename}")
+async def read_note(category: str, filename: str):
+
+    file_path = os.path.join(
+        VAULT_PATH,
+        category,
+        filename
+    )
+
+    with open(
+        file_path,
+        "r",
+        encoding="utf-8"
+    ) as f:
+
+        content = f.read()
+
+    return {
+        "file": filename,
+        "category": category,
+        "content": content
+    }

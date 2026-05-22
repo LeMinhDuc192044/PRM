@@ -26,9 +26,22 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
 
-  String result = "";
+  List notes = [];
 
   String selectedCategory = "AI";
+
+  Future<void> fetchNotes() async {
+
+    var response = await http.get(
+      Uri.parse('http://127.0.0.1:8000/notes'),
+    );
+
+    var data = jsonDecode(response.body);
+
+    setState(() {
+      notes = data;
+    });
+  }
 
   Future<void> uploadPdf() async {
 
@@ -47,10 +60,8 @@ class _HomePageState extends State<HomePage> {
       Uri.parse('http://127.0.0.1:8000/extract'),
     );
 
-    // Add selected category
     request.fields['category'] = selectedCategory;
 
-    // Add PDF file
     request.files.add(
       await http.MultipartFile.fromPath(
         'file',
@@ -58,30 +69,26 @@ class _HomePageState extends State<HomePage> {
       ),
     );
 
-    var response = await request.send();
+    await request.send();
 
-    var responseString =
-        await response.stream.bytesToString();
+    await fetchNotes();
+  }
 
-    var jsonData = jsonDecode(responseString);
-
-    setState(() {
-      result = """
-Saved Successfully
-
-Category: ${jsonData["category"]}
-
-File: ${jsonData["file"]}
-""";
-    });
+  @override
+  void initState() {
+    super.initState();
+    fetchNotes();
   }
 
   @override
   Widget build(BuildContext context) {
 
     return Scaffold(
+
       appBar: AppBar(
-        title: const Text("Scientific Paper Reader"),
+        title: const Text(
+          "Scientific Paper Reader",
+        ),
       ),
 
       body: Padding(
@@ -103,12 +110,16 @@ File: ${jsonData["file"]}
 
                 DropdownMenuItem(
                   value: "ComputerScience",
-                  child: Text("Computer Science"),
+                  child: Text(
+                    "Computer Science",
+                  ),
                 ),
 
                 DropdownMenuItem(
                   value: "DataScience",
-                  child: Text("Data Science"),
+                  child: Text(
+                    "Data Science",
+                  ),
                 ),
               ],
 
@@ -123,17 +134,142 @@ File: ${jsonData["file"]}
 
             ElevatedButton(
               onPressed: uploadPdf,
-              child: const Text("Upload PDF"),
+              child: const Text(
+                "Upload PDF",
+              ),
             ),
 
             const SizedBox(height: 20),
 
             Expanded(
-              child: SingleChildScrollView(
-                child: Text(result),
+              child: ListView.builder(
+
+                itemCount: notes.length,
+
+                itemBuilder: (context, index) {
+
+                  var note = notes[index];
+
+                  return GestureDetector(
+
+                    onTap: () {
+
+                      Navigator.push(
+                        context,
+
+                        MaterialPageRoute(
+                          builder: (_) => ReaderPage(
+                            category: note["category"],
+                            file: note["file"],
+                          ),
+                        ),
+                      );
+                    },
+
+                    child: Card(
+
+                      child: Padding(
+                        padding:
+                            const EdgeInsets.all(12),
+
+                        child: Column(
+                          crossAxisAlignment:
+                              CrossAxisAlignment.start,
+
+                          children: [
+
+                            Text(
+                              note["file"],
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight:
+                                    FontWeight.bold,
+                              ),
+                            ),
+
+                            const SizedBox(height: 5),
+
+                            Text(
+                              note["category"],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                },
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class ReaderPage extends StatefulWidget {
+
+  final String category;
+  final String file;
+
+  const ReaderPage({
+    super.key,
+    required this.category,
+    required this.file,
+  });
+
+  @override
+  State<ReaderPage> createState() =>
+      _ReaderPageState();
+}
+
+class _ReaderPageState
+    extends State<ReaderPage> {
+
+  String content = "";
+
+  Future<void> readNote() async {
+
+    var response = await http.get(
+
+      Uri.parse(
+        'http://127.0.0.1:8000/read/${widget.category}/${widget.file}',
+      ),
+    );
+
+    var data = jsonDecode(response.body);
+
+    setState(() {
+      content = data["content"];
+    });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    readNote();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+
+    return Scaffold(
+
+      appBar: AppBar(
+        title: Text(widget.file),
+      ),
+
+      body: Padding(
+        padding: const EdgeInsets.all(20),
+
+        child: SingleChildScrollView(
+          child: Text(
+            content,
+            style: const TextStyle(
+              fontSize: 16,
+              height: 1.5,
+            ),
+          ),
         ),
       ),
     );
