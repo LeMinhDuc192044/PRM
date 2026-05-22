@@ -5,8 +5,23 @@ import os
 
 app = FastAPI()
 
-VAULT_PATH = r"C:\Users\admin\Desktop\2026\Semester_8\PRM393\Project\PRM\project_1_prm\ObsidianVault"
+BASE_DIR = os.path.dirname(
+    os.path.abspath(__file__)
+)
 
+PROJECT_DIR = os.path.dirname(
+    BASE_DIR
+)
+
+VAULT_PATH = os.path.join(
+    PROJECT_DIR,
+    "ObsidianVault"
+)
+
+os.makedirs(
+    VAULT_PATH,
+    exist_ok=True
+)
 @app.post("/extract")
 async def extract(
     file: UploadFile = File(...),
