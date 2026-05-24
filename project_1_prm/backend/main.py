@@ -1,7 +1,8 @@
 from fastapi import FastAPI, UploadFile, File, Form
-import fitz
 import shutil
 import os
+import requests
+from bs4 import BeautifulSoup
 
 app = FastAPI()
 
@@ -22,52 +23,220 @@ os.makedirs(
     VAULT_PATH,
     exist_ok=True
 )
+
+GROBID_URL = "http://localhost:8070/api/processFulltextDocument"
+
+
 @app.post("/extract")
 async def extract(
     file: UploadFile = File(...),
     category: str = Form(...)
 ):
 
-    # Save uploaded PDF temporarily
+    # Save temporary PDF
     pdf_path = file.filename
 
     with open(pdf_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
 
-    # Read PDF
-    doc = fitz.open(pdf_path)
+    # Send PDF to GROBID
+    with open(pdf_path, "rb") as pdf_file:
 
-    text = ""
+        response = requests.post(
+            GROBID_URL,
+            files={
+                "input": pdf_file
+            }
+        )
 
-    for page in doc:
-        text += page.get_text()
+    # Parse XML
+    soup = BeautifulSoup(
+        response.text,
+        "xml"
+    )
 
-    doc.close()
+    # =========================
+    # TITLE
+    # =========================
 
-    # Create category folder path
-    category_folder = os.path.join(VAULT_PATH, category)
+    title = "Unknown Title"
 
-    # Create folder if not exists
-    os.makedirs(category_folder, exist_ok=True)
+    title_tag = soup.find("title")
 
-    # Generate .md filename
-    output_file = file.filename.replace(".pdf", ".md")
-    
-    # Full save path
-    output_path = os.path.join(category_folder, output_file)
+    if title_tag:
+        title = title_tag.text.strip()
 
-    # Save .mmd file
-    with open(output_path, "w", encoding="utf-8") as f:
-        f.write(text)
+    # =========================
+    # ABSTRACT
+    # =========================
 
-    # Remove temporary PDF
+    abstract = ""
+
+    abstract_tag = soup.find("abstract")
+
+    if abstract_tag:
+        abstract = abstract_tag.text.strip()
+
+    # =========================
+    # DOI
+    # =========================
+
+    doi = "Unknown DOI"
+
+    doi_tag = soup.find("idno", type="DOI")
+
+    if doi_tag:
+        doi = doi_tag.text.strip()
+
+    # =========================
+    # AUTHORS
+    # =========================
+
+    authors = []
+
+    for author in soup.find_all("author"):
+
+        pers_name = author.find("persName")
+
+        if pers_name:
+
+            first = pers_name.find("forename")
+            last = pers_name.find("surname")
+
+            first_name = (
+                first.text.strip()
+                if first else ""
+            )
+
+            last_name = (
+                last.text.strip()
+                if last else ""
+            )
+
+            full_name = (
+                first_name + " " + last_name
+            ).strip()
+
+            if full_name:
+                authors.append(full_name)
+
+    # =========================
+    # SECTIONS
+    # =========================
+
+    sections = ""
+
+    for div in soup.find_all("div"):
+
+        head = div.find("head")
+
+        if head:
+
+            section_title = head.text.strip()
+
+            paragraphs = div.find_all("p")
+
+            section_text = ""
+
+            for p in paragraphs:
+                section_text += p.text.strip()
+                section_text += "\n\n"
+
+            sections += f"# {section_title}\n\n"
+            sections += section_text
+            sections += "\n"
+
+    # =========================
+    # REFERENCES
+    # =========================
+
+    references = ""
+
+    refs = soup.find_all("biblStruct")
+
+    for i, ref in enumerate(refs):
+
+        ref_title = ref.find("title")
+
+        if ref_title:
+
+            references += (
+                f"{i+1}. "
+                f"{ref_title.text.strip()}\n"
+            )
+
+    # =========================
+    # BUILD MARKDOWN
+    # =========================
+
+    markdown_content = f"""
+# {title}
+
+## DOI
+
+{doi}
+
+## Authors
+
+{", ".join(authors)}
+
+## Abstract
+
+{abstract}
+
+## Content
+
+{sections}
+
+## References
+
+{references}
+"""
+
+    # =========================
+    # SAVE TO OBSIDIAN
+    # =========================
+
+    category_folder = os.path.join(
+        VAULT_PATH,
+        category
+    )
+
+    os.makedirs(
+        category_folder,
+        exist_ok=True
+    )
+
+    output_file = file.filename.replace(
+        ".pdf",
+        ".md"
+    )
+
+    output_path = os.path.join(
+        category_folder,
+        output_file
+    )
+
+    with open(
+        output_path,
+        "w",
+        encoding="utf-8"
+    ) as f:
+
+        f.write(markdown_content)
+
+    # Remove temp PDF
     os.remove(pdf_path)
 
     return {
         "message": "Saved successfully",
         "category": category,
-        "file": output_file
+        "file": output_file,
+        "title": title,
+        "doi": doi,
+        "authors": authors
     }
+
 
 @app.get("/notes")
 async def get_notes():
@@ -93,19 +262,6 @@ async def get_notes():
 
                 if file.endswith(".md"):
 
-                    file_path = os.path.join(
-                        category_path,
-                        file
-                    )
-
-                    with open(
-                        file_path,
-                        "r",
-                        encoding="utf-8"
-                    ) as f:
-
-                        content = f.read()
-
                     notes.append({
                         "category": category,
                         "file": file
@@ -113,8 +269,12 @@ async def get_notes():
 
     return notes
 
+
 @app.get("/read/{category}/{filename}")
-async def read_note(category: str, filename: str):
+async def read_note(
+    category: str,
+    filename: str
+):
 
     file_path = os.path.join(
         VAULT_PATH,
