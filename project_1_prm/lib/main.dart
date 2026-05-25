@@ -83,6 +83,12 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
 
+    List filteredNotes = notes.where((note) {
+
+    return note["category"] == selectedCategory;
+
+    }).toList();
+
     return Scaffold(
 
       appBar: AppBar(
@@ -144,11 +150,11 @@ class _HomePageState extends State<HomePage> {
             Expanded(
               child: ListView.builder(
 
-                itemCount: notes.length,
+                itemCount: filteredNotes.length,
 
                 itemBuilder: (context, index) {
 
-                  var note = notes[index];
+                  var note = filteredNotes[index];
 
                   return GestureDetector(
 
