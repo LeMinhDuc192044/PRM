@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "ICLR-2024-labeldp-pro-learning-with-label-differential-privacy-via-projections-Paper-Conference.md",
+                "file": "Welcome.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "ICLR-2024-labeldp-pro-learning-with-label-differential-privacy-via-projections-Paper-Conference"
+              "title": "Welcome"
             }
           }
         ]
@@ -185,9 +185,9 @@
   },
   "active": "886330759033edc7",
   "lastOpenFiles": [
-    "Untitled.base",
     "ICLR-2024-labeldp-pro-learning-with-label-differential-privacy-via-projections-Paper-Conference.md",
     "2026-05-21.md",
+    "Untitled.base",
     "Welcome.md"
   ]
 }
