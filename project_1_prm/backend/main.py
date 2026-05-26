@@ -118,31 +118,36 @@ async def extract(
 
     authors = []
 
-    for author in soup.find_all("author"):
+# ONLY get authors from analytic section
+    analytic = soup.find("analytic")
 
-        pers_name = author.find("persName")
+    if analytic:
 
-        if pers_name:
+        for author in analytic.find_all("author"):
 
-            first = pers_name.find("forename")
-            last = pers_name.find("surname")
+            pers_name = author.find("persName")
 
-            first_name = (
-                first.text.strip()
-                if first else ""
-            )
+            if pers_name:
 
-            last_name = (
-                last.text.strip()
-                if last else ""
-            )
+                first = pers_name.find("forename")
+                last = pers_name.find("surname")
 
-            full_name = (
-                first_name + " " + last_name
-            ).strip()
+                first_name = (
+                    first.text.strip()
+                    if first else ""
+                )
 
-            if full_name:
-                authors.append(full_name)
+                last_name = (
+                    last.text.strip()
+                    if last else ""
+                )
+
+                full_name = (
+                    first_name + " " + last_name
+                ).strip()
+
+                if full_name:
+                    authors.append(full_name)
 
     # =========================
     # SECTIONS
