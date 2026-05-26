@@ -1,8 +1,50 @@
-# Local notes/data
+# Local data
 *.sqlite
 *.db
 *.log
 
 # Python
 __pycache__/
-*.pyc
+*.py[cod]
+*.pyd
+*.so
+.venv/
+venv/
+env/
+.python-version
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Flutter / Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+build/
+**/build/
+
+# Android
+android/.gradle/
+android/local.properties
+
+# iOS
+ios/Flutter/Generated.xcconfig
+ios/Flutter/ephemeral/
+ios/Runner/GeneratedPluginRegistrant.h
+ios/Runner/GeneratedPluginRegistrant.m
+
+# Desktop Flutter generated files
+linux/flutter/ephemeral/
+macos/Flutter/ephemeral/
+windows/flutter/ephemeral/
+
+# Obsidian
+ObsidianVault/.obsidian/
+.obsidian/
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
