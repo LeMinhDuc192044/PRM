@@ -4,6 +4,10 @@
 .pub/
 build/
 
+# Python
+__pycache__/
+*.pyc
+
 # Flutter generated
 .flutter-plugins
 .flutter-plugins-dependencies
