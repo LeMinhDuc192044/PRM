@@ -168,9 +168,29 @@ async def extract(
             section_text = ""
 
             for p in paragraphs:
-                section_text += p.text.strip()
+
+                # Preserve formulas better
+                formula_tags = p.find_all("formula")
+
+                paragraph_text = p.get_text(" ", strip=True)
+
+                # Replace formulas with LaTeX blocks
+                for formula in formula_tags:
+
+                    formula_text = formula.get_text(" ", strip=True)
+
+                    latex_block = f"\n$$\n{formula_text}\n$$\n"
+
+                    paragraph_text = paragraph_text.replace(
+                        formula_text,
+                        latex_block
+                    )
+
+                section_text += paragraph_text
                 section_text += "\n\n"
 
+            # IMPORTANT:
+            # Move this OUTSIDE the paragraph loop
             sections += f"# {section_title}\n\n"
             sections += section_text
             sections += "\n"
