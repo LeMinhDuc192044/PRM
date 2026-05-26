@@ -1,71 +1,62 @@
 import 'dart:convert';
+import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:http/http.dart' as http;
+import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 
 void main() {
-  runApp(const MyApp());
+  runApp(const ScientificPaperReaderApp());
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class ScientificPaperReaderApp extends StatelessWidget {
+  const ScientificPaperReaderApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    const seed = Color(0xFF163B6C);
+    const seed = Color(0xFF1E4E8C);
 
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Scientific Paper Reader',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: seed,
-          brightness: Brightness.light,
-        ),
-        scaffoldBackgroundColor: const Color(0xFFF4F7FB),
         useMaterial3: true,
-        appBarTheme: const AppBarTheme(
-          centerTitle: false,
-          elevation: 0,
-          backgroundColor: Colors.transparent,
-          foregroundColor: Color(0xFF14314F),
-        ),
-        textTheme: const TextTheme(
-          bodyMedium: TextStyle(height: 1.5),
-          bodyLarge: TextStyle(height: 1.5),
-        ),
+        colorScheme: ColorScheme.fromSeed(seedColor: seed),
+        scaffoldBackgroundColor: const Color(0xFFF3F6F9),
       ),
-      home: const HomePage(),
+      home: const MainReaderScreen(),
     );
   }
 }
 
-class NoteItem {
+class DocumentItem {
   final String category;
   final String file;
 
-  const NoteItem({
+  const DocumentItem({
     required this.category,
     required this.file,
   });
 
-  factory NoteItem.fromJson(Map<String, dynamic> json) {
-    return NoteItem(
+  factory DocumentItem.fromJson(Map<String, dynamic> json) {
+    return DocumentItem(
       category: (json['category'] ?? '').toString(),
       file: (json['file'] ?? '').toString(),
     );
   }
 }
 
-class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+class MainReaderScreen extends StatefulWidget {
+  const MainReaderScreen({super.key});
 
   @override
-  State<HomePage> createState() => _HomePageState();
+  State<MainReaderScreen> createState() => _MainReaderScreenState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _MainReaderScreenState extends State<MainReaderScreen> {
   static const String backendBaseUrl = 'http://127.0.0.1:8000';
   static const List<String> categories = <String>[
     'AI',
@@ -73,36 +64,44 @@ class _HomePageState extends State<HomePage> {
     'DataScience',
   ];
 
-  final TextEditingController _searchController = TextEditingController();
+  final TextEditingController _fileSearchController = TextEditingController();
+  final TextEditingController _contentSearchController = TextEditingController();
+  final PdfViewerController _pdfController = PdfViewerController();
 
-  List<NoteItem> notes = <NoteItem>[];
-  String selectedCategory = 'AI';
-  String searchQuery = '';
-  bool isLoading = true;
-  bool isUploading = false;
-  String? errorMessage;
+  List<DocumentItem> _documents = <DocumentItem>[];
+  String _fileSearchQuery = '';
+  String _contentSearchQuery = '';
+  String? _selectedCategory = 'AI';
+  String? _selectedFile;
+  String? _selectedContent;
+  String? _selectedPath;
+  String? _selectedKind;
+  bool _isLoading = true;
+  String? _errorMessage;
+  double _sidebarWidth = 340;
 
   @override
   void initState() {
     super.initState();
-    fetchNotes();
+    _fetchDocuments();
   }
 
   @override
   void dispose() {
-    _searchController.dispose();
+    _fileSearchController.dispose();
+    _contentSearchController.dispose();
+    _pdfController.dispose();
     super.dispose();
   }
 
-  Future<void> fetchNotes() async {
+  Future<void> _fetchDocuments() async {
     setState(() {
-      isLoading = true;
-      errorMessage = null;
+      _isLoading = true;
+      _errorMessage = null;
     });
 
     try {
       final response = await http.get(Uri.parse('$backendBaseUrl/notes'));
-
       if (response.statusCode != 200) {
         throw Exception('HTTP ${response.statusCode}');
       }
@@ -111,278 +110,556 @@ class _HomePageState extends State<HomePage> {
       final List<dynamic> rawList = data is List ? data : <dynamic>[];
 
       setState(() {
-        notes = rawList
+        _documents = rawList
             .whereType<Map<String, dynamic>>()
-            .map(NoteItem.fromJson)
+            .map(DocumentItem.fromJson)
             .toList();
       });
     } catch (e) {
       setState(() {
-        errorMessage = 'Không tải được danh sách ghi chú. ${e.toString()}';
+        _errorMessage = 'Failed to load documents. ${e.toString()}';
       });
     } finally {
       if (mounted) {
         setState(() {
-          isLoading = false;
+          _isLoading = false;
         });
       }
     }
   }
 
-  Future<void> uploadPdf() async {
-    if (isUploading) return;
-
+  Future<void> _uploadPdf() async {
     final picked = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: <String>['pdf'],
+      allowMultiple: false,
+      withData: false,
     );
 
     if (picked == null || picked.files.single.path == null) return;
 
-    setState(() {
-      isUploading = true;
-      errorMessage = null;
-    });
+    final request = http.MultipartRequest(
+      'POST',
+      Uri.parse('$backendBaseUrl/extract'),
+    );
 
-    try {
-      final request = http.MultipartRequest(
-        'POST',
-        Uri.parse('$backendBaseUrl/extract'),
-      );
+    request.fields['category'] = _selectedCategory ?? categories.first;
+    request.files.add(
+      await http.MultipartFile.fromPath('file', picked.files.single.path!),
+    );
 
-      request.fields['category'] = selectedCategory;
-      request.files.add(
-        await http.MultipartFile.fromPath(
-          'file',
-          picked.files.single.path!,
-        ),
-      );
-
-      final response = await request.send();
-
-      if (response.statusCode >= 400) {
-        throw Exception('HTTP ${response.statusCode}');
-      }
-
-      await fetchNotes();
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Đã xử lý PDF vào danh mục ${_displayCategory(selectedCategory)}'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        errorMessage = 'Upload thất bại. ${e.toString()}';
-      });
-    } finally {
-      if (mounted) {
-        setState(() {
-          isUploading = false;
-        });
-      }
+    final response = await request.send();
+    if (response.statusCode >= 400) {
+      throw Exception('HTTP ${response.statusCode}');
     }
+
+    await _fetchDocuments();
   }
 
-  List<NoteItem> get filteredNotes {
-    if (searchQuery.trim().isEmpty) return notes;
-    final query = searchQuery.toLowerCase();
-    return notes.where((note) {
-      return note.file.toLowerCase().contains(query) ||
-          note.category.toLowerCase().contains(query);
+  List<DocumentItem> get _filteredDocuments {
+    final query = _fileSearchQuery.trim().toLowerCase();
+    if (query.isEmpty) return _documents;
+    return _documents.where((document) {
+      return document.file.toLowerCase().contains(query) ||
+          document.category.toLowerCase().contains(query);
     }).toList();
+  }
+
+  Map<String, List<DocumentItem>> get _groupedDocuments {
+    final Map<String, List<DocumentItem>> grouped = <String, List<DocumentItem>>{
+      for (final category in categories) category: <DocumentItem>[],
+    };
+
+    for (final document in _filteredDocuments) {
+      grouped.putIfAbsent(document.category, () => <DocumentItem>[]).add(document);
+    }
+
+    return grouped;
+  }
+
+  Future<void> _openDocument(DocumentItem document) async {
+    final filePath = _localDocumentPath(document);
+    final file = File(filePath);
+    final exists = await file.exists();
+
+    String? content;
+    String kind = _isMarkdown(document.file) ? 'markdown' : 'pdf';
+
+    if (exists && _isMarkdown(document.file)) {
+      content = await file.readAsString();
+    } else if (exists && !_isMarkdown(document.file)) {
+      kind = 'pdf';
+    } else if (exists) {
+      content = await file.readAsString();
+      kind = 'markdown';
+    } else {
+      kind = 'missing';
+    }
+
+    setState(() {
+      _selectedFile = document.file;
+      _selectedCategory = document.category;
+      _selectedPath = filePath;
+      _selectedKind = kind;
+      _selectedContent = content;
+    });
+  }
+
+  void _clearSelection() {
+    setState(() {
+      _selectedFile = null;
+      _selectedContent = null;
+      _selectedPath = null;
+      _selectedKind = null;
+    });
+  }
+
+  int get _filteredCount {
+    return _groupedDocuments.values.fold<int>(0, (sum, list) => sum + list.length);
   }
 
   @override
   Widget build(BuildContext context) {
-    final visibleNotes = filteredNotes;
+    final screenWidth = MediaQuery.of(context).size.width;
 
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: <Color>[
-              Color(0xFFF4F7FB),
-              Color(0xFFEAF1FF),
-              Color(0xFFF9FAFC),
+      appBar: AppBar(
+        title: const Text(
+          'Scientific Paper Reader',
+          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+        ),
+        actions: <Widget>[
+          IconButton(
+            onPressed: _fetchDocuments,
+            icon: const Icon(Icons.refresh_rounded),
+            tooltip: 'Refresh',
+          ),
+        ],
+      ),
+      body: SizedBox(
+        height: MediaQuery.of(context).size.height,
+        child: Row(
+          children: <Widget>[
+            SizedBox(
+              width: _sidebarWidth,
+              child: _Sidebar(
+                fileSearchController: _fileSearchController,
+                fileSearchQuery: _fileSearchQuery,
+                onFileSearchChanged: (value) {
+                  setState(() {
+                    _fileSearchQuery = value;
+                  });
+                },
+                onClearFileSearch: () {
+                  setState(() {
+                    _fileSearchQuery = '';
+                    _fileSearchController.clear();
+                  });
+                },
+                onUpload: () async {
+                  try {
+                    await _uploadPdf();
+                    if (!mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('PDF uploaded successfully'),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  } catch (e) {
+                    if (!mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Upload failed: $e'),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  }
+                },
+                categories: categories,
+                groupedDocuments: _groupedDocuments,
+                selectedCategory: _selectedCategory,
+                selectedFile: _selectedFile,
+                onCategorySelected: (category) {
+                  setState(() {
+                    _selectedCategory = category;
+                  });
+                },
+                onFileSelected: _openDocument,
+                searchCount: _filteredCount,
+                searchQuery: _fileSearchQuery,
+              ),
+            ),
+            _SplitHandle(
+              onDrag: (delta) {
+                setState(() {
+                  _sidebarWidth = (_sidebarWidth + delta).clamp(300.0, math.max(420.0, screenWidth * 0.42));
+                });
+              },
+            ),
+            Expanded(
+              child: _ReaderCanvas(
+                isLoading: _isLoading,
+                errorMessage: _errorMessage,
+                selectedFile: _selectedFile,
+                selectedPath: _selectedPath,
+                selectedKind: _selectedKind,
+                selectedContent: _selectedContent,
+                contentSearchController: _contentSearchController,
+                contentSearchQuery: _contentSearchQuery,
+                onContentSearchChanged: (value) {
+                  setState(() {
+                    _contentSearchQuery = value;
+                  });
+                  if (_selectedKind == 'pdf') {
+                    _pdfController.searchText(value);
+                  }
+                },
+                onClearContentSearch: () {
+                  setState(() {
+                    _contentSearchQuery = '';
+                    _contentSearchController.clear();
+                  });
+                  if (_selectedKind == 'pdf') {
+                    _pdfController.clearSelection();
+                  }
+                },
+                pdfController: _pdfController,
+                onClearSelection: _clearSelection,
+                onRetry: _fetchDocuments,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _Sidebar extends StatelessWidget {
+  final TextEditingController fileSearchController;
+  final String fileSearchQuery;
+  final ValueChanged<String> onFileSearchChanged;
+  final VoidCallback onClearFileSearch;
+  final VoidCallback onUpload;
+  final List<String> categories;
+  final Map<String, List<DocumentItem>> groupedDocuments;
+  final String? selectedCategory;
+  final String? selectedFile;
+  final ValueChanged<String> onCategorySelected;
+  final Future<void> Function(DocumentItem) onFileSelected;
+  final int searchCount;
+  final String searchQuery;
+
+  const _Sidebar({
+    required this.fileSearchController,
+    required this.fileSearchQuery,
+    required this.onFileSearchChanged,
+    required this.onClearFileSearch,
+    required this.onUpload,
+    required this.categories,
+    required this.groupedDocuments,
+    required this.selectedCategory,
+    required this.selectedFile,
+    required this.onCategorySelected,
+    required this.onFileSelected,
+    required this.searchCount,
+    required this.searchQuery,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final bool hasSearch = searchQuery.trim().isNotEmpty;
+
+    return Container(
+      color: Colors.white,
+      child: Column(
+        children: <Widget>[
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: <Color>[Color(0xFF1E4E8C), Color(0xFF2E6AC0)],
+              ),
+            ),
+            child: const Row(
+              children: <Widget>[
+                Icon(Icons.menu_book_rounded, color: Colors.white),
+                SizedBox(width: 10),
+                Text(
+                  'Documents & Topics',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                TextField(
+                  controller: fileSearchController,
+                  onChanged: onFileSearchChanged,
+                  decoration: InputDecoration(
+                    hintText: 'Search file name or topic...',
+                    prefixIcon: const Icon(Icons.search_rounded),
+                    filled: true,
+                    fillColor: const Color(0xFFF1F5FB),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                if (hasSearch)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEAF1FF),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFD6E3FA)),
+                    ),
+                    child: Row(
+                      children: <Widget>[
+                        const Icon(Icons.filter_alt_rounded, size: 18, color: Color(0xFF1E4E8C)),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Filtering by "$searchQuery"',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Color(0xFF14314F),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: onClearFileSearch,
+                          child: const Text('Clear'),
+                        ),
+                      ],
+                    ),
+                  ),
+                if (hasSearch) const SizedBox(height: 12),
+                SizedBox(
+                  height: 42,
+                  child: ElevatedButton.icon(
+                    onPressed: onUpload,
+                    icon: const Icon(Icons.upload_file_rounded, size: 18),
+                    label: const Text('Upload PDF'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF1E4E8C),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.all(12),
+              children: categories.map((category) {
+                final items = groupedDocuments[category] ?? <DocumentItem>[];
+                final isExpanded = hasSearch ? items.isNotEmpty : selectedCategory == category;
+
+                if (hasSearch && items.isEmpty) {
+                  return const SizedBox.shrink();
+                }
+
+                return ExpansionTile(
+                  initiallyExpanded: isExpanded,
+                  collapsedBackgroundColor: Colors.white,
+                  backgroundColor: const Color(0xFFF7FAFF),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  collapsedShape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  title: Text(
+                    '$category (${items.length})',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF1E4E8C),
+                    ),
+                  ),
+                  leading: const Icon(Icons.folder_rounded, color: Color(0xFF1E4E8C)),
+                  onExpansionChanged: (expanded) {
+                    if (expanded) onCategorySelected(category);
+                  },
+                  children: items.isEmpty
+                      ? <Widget>[
+                          const ListTile(
+                            dense: true,
+                            title: Text(
+                              'No documents',
+                              style: TextStyle(color: Color(0xFF6C7B8D)),
+                            ),
+                          ),
+                        ]
+                      : items.map((document) {
+                          final bool selected = document.file == selectedFile;
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: selected ? const Color(0xFFDCE9FF) : Colors.white,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: selected ? const Color(0xFFB7D0FA) : const Color(0xFFE3EAF3),
+                                ),
+                              ),
+                              child: ListTile(
+                                selected: selected,
+                                selectedTileColor: const Color(0xFFDCE9FF),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                leading: Icon(
+                                  _isMarkdown(document.file)
+                                      ? Icons.description_rounded
+                                      : Icons.picture_as_pdf_rounded,
+                                  color: selected ? const Color(0xFF103A73) : const Color(0xFF1E4E8C),
+                                ),
+                                title: _highlightedFileTitle(
+                                  document.file,
+                                  searchQuery,
+                                  selected ? const Color(0xFF103A73) : const Color(0xFF24364B),
+                                  selected ? FontWeight.w700 : FontWeight.w500,
+                                ),
+                                onTap: () => onFileSelected(document),
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                );
+              }).whereType<Widget>().toList(),
+            ),
+          ),
+          if (hasSearch)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: const BoxDecoration(
+                color: Color(0xFFF8FAFD),
+                border: Border(
+                  top: BorderSide(color: Color(0xFFE2E9F3)),
+                ),
+              ),
+              child: Text(
+                searchCount == 0
+                    ? 'No matching documents found'
+                    : 'Found $searchCount matching documents',
+                style: const TextStyle(
+                  color: Color(0xFF6C7B8D),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ReaderCanvas extends StatelessWidget {
+  final bool isLoading;
+  final String? errorMessage;
+  final String? selectedFile;
+  final String? selectedPath;
+  final String? selectedKind;
+  final String? selectedContent;
+  final TextEditingController contentSearchController;
+  final String contentSearchQuery;
+  final ValueChanged<String> onContentSearchChanged;
+  final VoidCallback onClearContentSearch;
+  final PdfViewerController pdfController;
+  final VoidCallback onClearSelection;
+  final VoidCallback onRetry;
+
+  const _ReaderCanvas({
+    required this.isLoading,
+    required this.errorMessage,
+    required this.selectedFile,
+    required this.selectedPath,
+    required this.selectedKind,
+    required this.selectedContent,
+    required this.contentSearchController,
+    required this.contentSearchQuery,
+    required this.onContentSearchChanged,
+    required this.onClearContentSearch,
+    required this.pdfController,
+    required this.onClearSelection,
+    required this.onRetry,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (errorMessage != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              const Icon(Icons.cloud_off_rounded, size: 48, color: Color(0xFFB54747)),
+              const SizedBox(height: 12),
+              Text(errorMessage!, textAlign: TextAlign.center),
+              const SizedBox(height: 16),
+              FilledButton(
+                onPressed: onRetry,
+                child: const Text('Retry'),
+              ),
             ],
           ),
         ),
-        child: SafeArea(
-          child: RefreshIndicator(
-            onRefresh: fetchNotes,
-            child: CustomScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              slivers: <Widget>[
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
-                    child: _buildHeader(),
-                  ),
-                ),
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: _buildActionPanel(),
-                  ),
-                ),
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-                    child: _buildStatsRow(visibleNotes.length),
-                  ),
-                ),
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
-                    child: _buildSearchField(),
-                  ),
-                ),
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: _buildCategoryChips(),
-                  ),
-                ),
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-                    child: _buildSectionTitle(
-                      'Ghi chú đã xử lý',
-                      '${visibleNotes.length} kết quả',
-                    ),
-                  ),
-                ),
-                if (isLoading)
-                  const SliverFillRemaining(
-                    hasScrollBody: false,
-                    child: Center(child: CircularProgressIndicator()),
-                  )
-                else if (errorMessage != null)
-                  SliverFillRemaining(
-                    hasScrollBody: false,
-                    child: _buildErrorState(),
-                  )
-                else if (visibleNotes.isEmpty)
-                  SliverFillRemaining(
-                    hasScrollBody: false,
-                    child: _buildEmptyState(),
-                  )
-                else
-                  SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-                    sliver: SliverList.separated(
-                      itemCount: visibleNotes.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 12),
-                      itemBuilder: (context, index) {
-                        final note = visibleNotes[index];
-                        return _NoteCard(
-                          note: note,
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => ReaderPage(
-                                  category: note.category,
-                                  file: note.file,
-                                ),
-                              ),
-                            );
-                          },
-                        );
-                      },
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
+      );
+    }
 
-  Widget _buildHeader() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(28),
-        gradient: const LinearGradient(
-          colors: <Color>[
-            Color(0xFF163B6C),
-            Color(0xFF275EAA),
+    if (selectedFile == null) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Icon(Icons.description_outlined, size: 88, color: Colors.grey.shade300),
+            const SizedBox(height: 16),
+            const Text(
+              'Select a document in the left sidebar to start reading',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 16, color: Color(0xFF6C7B8D)),
+            ),
           ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
         ),
-        boxShadow: const <BoxShadow>[
-          BoxShadow(
-            color: Color(0x260D1F3D),
-            blurRadius: 24,
-            offset: Offset(0, 12),
-          ),
-        ],
-      ),
-      child: Row(
-        children: <Widget>[
-          Container(
-            width: 54,
-            height: 54,
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.14),
-              borderRadius: BorderRadius.circular(18),
-            ),
-            child: const Icon(
-              Icons.menu_book_rounded,
-              color: Colors.white,
-              size: 30,
-            ),
-          ),
-          const SizedBox(width: 16),
-          const Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(
-                  'Scientific Paper Reader',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 24,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                SizedBox(height: 6),
-                Text(
-                  'Tải PDF, tra cứu nhanh và đọc lại nội dung đã trích xuất.',
-                  style: TextStyle(
-                    color: Colors.white70,
-                    fontSize: 13,
-                    height: 1.35,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+      );
+    }
 
-  Widget _buildActionPanel() {
     return Container(
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFFE4EBF4)),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFDAE4F1)),
         boxShadow: const <BoxShadow>[
           BoxShadow(
-            color: Color(0x0D17324D),
-            blurRadius: 18,
+            color: Color(0x120D1F3D),
+            blurRadius: 20,
             offset: Offset(0, 8),
           ),
         ],
@@ -390,702 +667,226 @@ class _HomePageState extends State<HomePage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          const Text(
-            'Tải PDF vào danh mục',
-            style: TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 12),
-          DropdownButtonFormField<String>(
-            value: selectedCategory,
-            decoration: InputDecoration(
-              filled: true,
-              fillColor: const Color(0xFFF7F9FC),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: BorderSide.none,
-              ),
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-            ),
-            items: categories
-                .map(
-                  (category) => DropdownMenuItem<String>(
-                    value: category,
-                    child: Text(_displayCategory(category)),
-                  ),
-                )
-                .toList(),
-            onChanged: (value) {
-              if (value == null) return;
-              setState(() {
-                selectedCategory = value;
-              });
-            },
-          ),
-          const SizedBox(height: 14),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton.icon(
-              onPressed: isUploading ? null : uploadPdf,
-              icon: isUploading
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.upload_file_rounded),
-              label: Text(isUploading ? 'Đang xử lý...' : 'Upload PDF'),
-              style: FilledButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatsRow(int visibleCount) {
-    return Row(
-      children: <Widget>[
-        Expanded(
-          child: _StatCard(
-            label: 'Tổng ghi chú',
-            value: notes.length.toString(),
-            icon: Icons.library_books_rounded,
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _StatCard(
-            label: 'Đang hiển thị',
-            value: visibleCount.toString(),
-            icon: Icons.manage_search_rounded,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSearchField() {
-    return TextField(
-      controller: _searchController,
-      onChanged: (value) {
-        setState(() {
-          searchQuery = value;
-        });
-      },
-      decoration: InputDecoration(
-        hintText: 'Tìm theo tên file hoặc danh mục...',
-        prefixIcon: const Icon(Icons.search_rounded),
-        suffixIcon: searchQuery.isEmpty
-            ? null
-            : IconButton(
-                onPressed: () {
-                  _searchController.clear();
-                  setState(() {
-                    searchQuery = '';
-                  });
-                },
-                icon: const Icon(Icons.close_rounded),
-              ),
-        filled: true,
-        fillColor: Colors.white,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(18),
-          borderSide: BorderSide.none,
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(18),
-          borderSide: const BorderSide(color: Color(0xFFE2E9F3)),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(18),
-          borderSide: const BorderSide(color: Color(0xFF275EAA), width: 1.5),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCategoryChips() {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: categories.map((category) {
-          final bool selected = category == selectedCategory;
-          return Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: ChoiceChip(
-              label: Text(_displayCategory(category)),
-              selected: selected,
-              onSelected: (_) {
-                setState(() {
-                  selectedCategory = category;
-                });
-              },
-              labelStyle: TextStyle(
-                color: selected ? Colors.white : const Color(0xFF14314F),
-                fontWeight: FontWeight.w600,
-              ),
-              selectedColor: const Color(0xFF275EAA),
-              backgroundColor: Colors.white,
-              side: const BorderSide(color: Color(0xFFD8E2EF)),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(30),
-              ),
-            ),
-          );
-        }).toList(),
-      ),
-    );
-  }
-
-  Widget _buildSectionTitle(String title, String subtitle) {
-    return Row(
-      children: <Widget>[
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                subtitle,
-                style: const TextStyle(
-                  color: Color(0xFF6C7B8D),
-                  fontSize: 13,
-                ),
-              ),
-            ],
-          ),
-        ),
-        IconButton(
-          onPressed: fetchNotes,
-          icon: const Icon(Icons.refresh_rounded),
-          tooltip: 'Làm mới',
-        ),
-      ],
-    );
-  }
-
-  Widget _buildEmptyState() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            Container(
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                color: const Color(0xFFEAF1FF),
-                borderRadius: BorderRadius.circular(24),
-              ),
-              child: const Icon(
-                Icons.find_in_page_rounded,
-                size: 42,
-                color: Color(0xFF275EAA),
-              ),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'Không có kết quả phù hợp',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            const SizedBox(height: 6),
-            const Text(
-              'Hãy thử đổi từ khóa tìm kiếm hoặc chọn danh mục khác.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Color(0xFF6C7B8D),
-                height: 1.45,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildErrorState() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            const Icon(
-              Icons.cloud_off_rounded,
-              size: 48,
-              color: Color(0xFFB54747),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              errorMessage ?? 'Có lỗi xảy ra.',
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: Color(0xFF8B2E2E),
-                height: 1.45,
-              ),
-            ),
-            const SizedBox(height: 16),
-            FilledButton(
-              onPressed: fetchNotes,
-              child: const Text('Thử lại'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _StatCard extends StatelessWidget {
-  final String label;
-  final String value;
-  final IconData icon;
-
-  const _StatCard({
-    required this.label,
-    required this.value,
-    required this.icon,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFE4EBF4)),
-      ),
-      child: Row(
-        children: <Widget>[
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: const Color(0xFFEAF1FF),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Icon(icon, color: const Color(0xFF275EAA)),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Row(
               children: <Widget>[
-                Text(
-                  value,
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w800,
+                Expanded(
+                  child: Text(
+                    selectedFile!,
+                    style: const TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF14314F),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  label,
-                  style: const TextStyle(
-                    color: Color(0xFF6C7B8D),
-                    fontSize: 12,
+                SizedBox(
+                  width: 290,
+                  child: TextField(
+                    controller: contentSearchController,
+                    onChanged: onContentSearchChanged,
+                    decoration: InputDecoration(
+                      hintText: 'Search in content...',
+                      prefixIcon: const Icon(Icons.find_in_page_rounded),
+                      suffixIcon: contentSearchQuery.isEmpty
+                          ? null
+                          : IconButton(
+                              onPressed: onClearContentSearch,
+                              icon: const Icon(Icons.close_rounded),
+                            ),
+                      filled: true,
+                      fillColor: const Color(0xFFF8FAFD),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: const BorderSide(color: Color(0xFFE2E9F3)),
+                      ),
+                    ),
                   ),
+                ),
+                const SizedBox(width: 8),
+                IconButton(
+                  onPressed: onClearSelection,
+                  icon: const Icon(Icons.close_rounded),
+                  tooltip: 'Close document',
                 ),
               ],
             ),
           ),
-        ],
-      ),
-    );
-  }
-}
-
-class _NoteCard extends StatelessWidget {
-  final NoteItem note;
-  final VoidCallback onTap;
-
-  const _NoteCard({
-    required this.note,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(22),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(22),
-          border: Border.all(color: const Color(0xFFE4EBF4)),
-          boxShadow: const <BoxShadow>[
-            BoxShadow(
-              color: Color(0x0A17324D),
-              blurRadius: 16,
-              offset: Offset(0, 6),
-            ),
-          ],
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: const Color(0xFFEAF1FF),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: const Icon(
-                Icons.picture_as_pdf_rounded,
-                color: Color(0xFF275EAA),
-              ),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(
-                    note.file,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: <Widget>[
-                      _Tag(text: _displayCategory(note.category)),
-                      const SizedBox(width: 8),
-                      const Icon(
-                        Icons.arrow_forward_ios_rounded,
-                        size: 14,
-                        color: Color(0xFF6C7B8D),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _Tag extends StatelessWidget {
-  final String text;
-
-  const _Tag({required this.text});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF1F5FB),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        text,
-        style: const TextStyle(
-          fontSize: 12,
-          color: Color(0xFF4A5B72),
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-    );
-  }
-}
-
-String _displayCategory(String category) {
-  if (category == 'ComputerScience') return 'Computer Science';
-  return category;
-}
-
-class ReaderPage extends StatefulWidget {
-  final String category;
-  final String file;
-
-  const ReaderPage({
-    super.key,
-    required this.category,
-    required this.file,
-  });
-
-  @override
-  State<ReaderPage> createState() => _ReaderPageState();
-}
-
-class _ReaderPageState extends State<ReaderPage> {
-  static const String backendBaseUrl = 'http://127.0.0.1:8000';
-
-  final TextEditingController _readerSearchController =
-      TextEditingController();
-
-  String content = '';
-  String readerQuery = '';
-  bool isLoading = true;
-  String? errorMessage;
-
-  @override
-  void initState() {
-    super.initState();
-    readNote();
-  }
-
-  @override
-  void dispose() {
-    _readerSearchController.dispose();
-    super.dispose();
-  }
-
-  Future<void> readNote() async {
-    setState(() {
-      isLoading = true;
-      errorMessage = null;
-    });
-
-    try {
-      final response = await http.get(
-        Uri.parse('$backendBaseUrl/read/${widget.category}/${widget.file}'),
-      );
-
-      if (response.statusCode != 200) {
-        throw Exception('HTTP ${response.statusCode}');
-      }
-
-      final dynamic data = jsonDecode(response.body);
-      setState(() {
-        content = (data['content'] ?? '').toString();
-      });
-    } catch (e) {
-      setState(() {
-        errorMessage = 'Không đọc được nội dung. ${e.toString()}';
-      });
-    } finally {
-      if (mounted) {
-        setState(() {
-          isLoading = false;
-        });
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final String highlightedContent = _filterContent(content, readerQuery);
-
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          widget.file,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        actions: <Widget>[
-          IconButton(
-            onPressed: readNote,
-            icon: const Icon(Icons.refresh_rounded),
-            tooltip: 'Làm mới nội dung',
-          ),
-        ],
-      ),
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: <Color>[
-              Color(0xFFF4F7FB),
-              Color(0xFFEAF1FF),
-              Color(0xFFF9FAFC),
-            ],
-          ),
-        ),
-        child: SafeArea(
-          child: Column(
-            children: <Widget>[
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(24),
-                    border: Border.all(color: const Color(0xFFE4EBF4)),
-                    boxShadow: const <BoxShadow>[
-                      BoxShadow(
-                        color: Color(0x0D17324D),
-                        blurRadius: 18,
-                        offset: Offset(0, 8),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      Row(
-                        children: <Widget>[
-                          _Tag(text: _displayCategory(widget.category)),
-                          const SizedBox(width: 8),
-                          const Icon(
-                            Icons.description_rounded,
-                            size: 18,
-                            color: Color(0xFF6C7B8D),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: _readerSearchController,
-                        onChanged: (value) {
-                          setState(() {
-                            readerQuery = value;
-                          });
-                        },
-                        decoration: InputDecoration(
-                          hintText: 'Tìm trong nội dung...',
-                          prefixIcon: const Icon(Icons.search_rounded),
-                          suffixIcon: readerQuery.isEmpty
-                              ? null
-                              : IconButton(
-                                  onPressed: () {
-                                    _readerSearchController.clear();
-                                    setState(() {
-                                      readerQuery = '';
-                                    });
-                                  },
-                                  icon: const Icon(Icons.close_rounded),
-                                ),
-                          filled: true,
-                          fillColor: const Color(0xFFF7F9FC),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            borderSide: BorderSide.none,
-                          ),
+          const Divider(height: 1),
+          if (contentSearchQuery.trim().isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEAF1FF),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFD6E3FA)),
+                ),
+                child: Row(
+                  children: <Widget>[
+                    const Icon(Icons.highlight_rounded, size: 18, color: Color(0xFF1E4E8C)),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Highlighting matches for "$contentSearchQuery"',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Color(0xFF14314F),
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                  child: Container(
-                    padding: const EdgeInsets.all(18),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(24),
-                      border: Border.all(color: const Color(0xFFE4EBF4)),
                     ),
-                    child: isLoading
-                        ? const Center(child: CircularProgressIndicator())
-                        : errorMessage != null
-                            ? _ReaderErrorState(
-                                message: errorMessage!,
-                                onRetry: readNote,
-                              )
-                            : highlightedContent.isEmpty
-                                ? const Center(
-                                    child: Text(
-                                      'Không có nội dung để hiển thị.',
-                                      style: TextStyle(
-                                        color: Color(0xFF6C7B8D),
-                                      ),
-                                    ),
-                                  )
-                                : SingleChildScrollView(
-                                    child: Text(
-                                      highlightedContent,
-                                      style: const TextStyle(
-                                        fontSize: 15,
-                                        height: 1.6,
-                                        color: Color(0xFF20324A),
-                                      ),
-                                    ),
-                                  ),
-                  ),
+                    TextButton(
+                      onPressed: onClearContentSearch,
+                      child: const Text('Clear'),
+                    ),
+                  ],
                 ),
               ),
-            ],
+            ),
+          const SizedBox(height: 10),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: _buildViewer(),
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
 
-  String _filterContent(String source, String query) {
-    final trimmed = query.trim();
-    if (trimmed.isEmpty || source.isEmpty) return source;
-
-    final lowerSource = source.toLowerCase();
-    final lowerQuery = trimmed.toLowerCase();
-    if (!lowerSource.contains(lowerQuery)) {
-      return 'Không tìm thấy từ khóa "$trimmed".\n\n$source';
+  Widget _buildViewer() {
+    if (selectedKind == 'pdf' && selectedPath != null && File(selectedPath!).existsSync()) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: SfPdfViewer.file(
+          File(selectedPath!),
+          controller: pdfController,
+          canShowScrollHead: true,
+          canShowScrollStatus: true,
+        ),
+      );
     }
-    return source;
-  }
-}
 
-class _ReaderErrorState extends StatelessWidget {
-  final String message;
-  final VoidCallback onRetry;
+    if (selectedContent != null) {
+      return Container(
+        decoration: BoxDecoration(
+          color: const Color(0xFFF8FAFD),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFE2E9F3)),
+        ),
+        padding: const EdgeInsets.all(16),
+        child: Markdown(
+          data: selectedContent!,
+          selectable: true,
+        ),
+      );
+    }
 
-  const _ReaderErrorState({
-    required this.message,
-    required this.onRetry,
-  });
-
-  @override
-  Widget build(BuildContext context) {
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
-          const Icon(
-            Icons.cloud_off_rounded,
-            size: 48,
-            color: Color(0xFFB54747),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            message,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: Color(0xFF8B2E2E),
-              height: 1.45,
-            ),
-          ),
+          Icon(Icons.description_outlined, size: 88, color: Colors.grey.shade300),
           const SizedBox(height: 16),
-          FilledButton(
-            onPressed: onRetry,
-            child: const Text('Thử lại'),
+          const Text(
+            'This file could not be found in the workspace.',
+            style: TextStyle(fontSize: 16, color: Color(0xFF6C7B8D)),
           ),
         ],
+      ),
+    );
+  }
+}
+
+Widget _highlightedFileTitle(
+  String fileName,
+  String query,
+  Color color,
+  FontWeight weight,
+) {
+  final trimmed = query.trim();
+  if (trimmed.isEmpty) {
+    return Text(
+      fileName,
+      maxLines: 2,
+      overflow: TextOverflow.ellipsis,
+      style: TextStyle(color: color, fontWeight: weight),
+    );
+  }
+
+  final lower = fileName.toLowerCase();
+  final q = trimmed.toLowerCase();
+  final index = lower.indexOf(q);
+  if (index < 0) {
+    return Text(
+      fileName,
+      maxLines: 2,
+      overflow: TextOverflow.ellipsis,
+      style: TextStyle(color: color, fontWeight: weight),
+    );
+  }
+
+  return RichText(
+    maxLines: 2,
+    overflow: TextOverflow.ellipsis,
+    text: TextSpan(
+      style: TextStyle(color: color, fontWeight: weight, fontSize: 14),
+        children: <InlineSpan>[
+        TextSpan(text: fileName.substring(0, index)),
+        TextSpan(
+          text: fileName.substring(index, index + trimmed.length),
+          style: const TextStyle(
+            backgroundColor: Color(0xFFA9D6FF),
+            color: Color(0xFF14314F),
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        TextSpan(text: fileName.substring(index + trimmed.length)),
+      ],
+    ),
+  );
+}
+
+bool _isMarkdown(String fileName) => fileName.toLowerCase().endsWith('.md');
+
+String _localDocumentPath(DocumentItem document) {
+  return '${Directory.current.path}${Platform.pathSeparator}ObsidianVault${Platform.pathSeparator}${document.category}${Platform.pathSeparator}${document.file}';
+}
+
+class _SplitHandle extends StatelessWidget {
+  final ValueChanged<double> onDrag;
+
+  const _SplitHandle({required this.onDrag});
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.resizeColumn,
+      child: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onHorizontalDragUpdate: (details) => onDrag(details.delta.dx),
+        child: Container(
+          width: 10,
+          color: Colors.transparent,
+          child: Center(
+            child: Container(
+              width: 2,
+              height: double.infinity,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
