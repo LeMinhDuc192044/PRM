@@ -1,65 +1,50 @@
-# Flutter/Dart
-.dart_tool/
-.packages
-.pub/
-build/
+# Local data
+*.sqlite
+*.db
+*.log
 
-# Flutter generated
+# Python
+__pycache__/
+*.py[cod]
+*.pyd
+*.so
+.venv/
+venv/
+env/
+.python-version
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Flutter / Dart
+.dart_tool/
 .flutter-plugins
 .flutter-plugins-dependencies
-.metadata
-
-# IDE
-.idea/
-.vscode/
-*.iml
+.packages
+build/
+**/build/
 
 # Android
 android/.gradle/
-android/app/debug
-android/app/profile
-android/app/release
+android/local.properties
 
 # iOS
-ios/Pods/
-ios/.symlinks/
-ios/Flutter/Flutter.framework
-ios/Flutter/Flutter.podspec
+ios/Flutter/Generated.xcconfig
+ios/Flutter/ephemeral/
+ios/Runner/GeneratedPluginRegistrant.h
+ios/Runner/GeneratedPluginRegistrant.m
 
-# macOS
-macos/Pods/
-
-# Windows
+# Desktop Flutter generated files
+linux/flutter/ephemeral/
+macos/Flutter/ephemeral/
 windows/flutter/ephemeral/
 
-# Linux
-linux/flutter/ephemeral/
+# Obsidian
+ObsidianVault/.obsidian/
+.obsidian/
 
-# Web
-web/flutter_service_worker.js
-web/.dart_tool/
-
-# Test coverage
-coverage/
-
-# Logs
-*.log
-
-# Environment files
-.env
-
-# Visual Studio
-.vs/
-bin/
-obj/
-
-# User-specific
-*.user
-*.suo
-
-# Obsidian Vault
-ObsidianVault/
-
-#Python
-__pycache__/    
-*.pyc
+# OS / editor noise
+.DS_Store
+Thumbs.db
