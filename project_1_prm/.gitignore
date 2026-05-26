@@ -56,3 +56,6 @@ obj/
 # User-specific
 *.user
 *.suo
+
+# Obsidian Vault
+ObsidianVault/
