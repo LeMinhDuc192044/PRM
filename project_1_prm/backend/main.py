@@ -1,5 +1,6 @@
 from fastapi import FastAPI, UploadFile, File, Form
 import shutil
+import re
 import os
 import requests
 from bs4 import BeautifulSoup
@@ -83,26 +84,32 @@ async def extract(
 
     doi = "Unknown DOI"
 
-    # Try standard DOI tag first
-    doi_tag = soup.find("idno", type="DOI")
+    doi_match = None
+
+    # Try normal DOI extraction first
+    doi_tag = soup.find(
+        "idno",
+        type="DOI"
+    )
 
     if doi_tag:
+
         doi = doi_tag.text.strip()
 
     else:
 
-    # Backup search
+        # Extract all XML text
         all_text = soup.get_text()
 
-    import re
-
-    doi_match = re.search(
-        r'10\.\d{4,9}/[-._;()/:A-Z0-9]+',
-        all_text,
-        re.IGNORECASE
-    )
+        # Regex DOI fallback
+        doi_match = re.search(
+            r'10\.\d{4,9}/[-._;()/:A-Z0-9]+',
+            all_text,
+            re.IGNORECASE
+        )
 
     if doi_match:
+
         doi = doi_match.group(0)
 
     # =========================
