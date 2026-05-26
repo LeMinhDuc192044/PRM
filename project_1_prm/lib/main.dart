@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -132,7 +133,7 @@ class _HomePageState extends State<HomePage> {
   Future<void> uploadPdf() async {
     if (isUploading) return;
 
-    final picked = await FilePicker.platform.pickFiles(
+    final picked = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: <String>['pdf'],
     );
