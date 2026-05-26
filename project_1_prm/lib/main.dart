@@ -132,7 +132,7 @@ class _HomePageState extends State<HomePage> {
   Future<void> uploadPdf() async {
     if (isUploading) return;
 
-    final picked = await FilePicker.pickFiles(
+    final picked = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: <String>['pdf'],
     );
