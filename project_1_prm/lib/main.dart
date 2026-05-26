@@ -12,20 +12,56 @@ void main() {
   runApp(const ScientificPaperReaderApp());
 }
 
+class AppColors {
+  static const Color ink = Color(0xFF102A43);
+  static const Color text = Color(0xFF334E68);
+  static const Color muted = Color(0xFF829AB1);
+  static const Color sky = Color(0xFF2F80ED);
+  static const Color blue = Color(0xFF1E4E8C);
+  static const Color cyan = Color(0xFF18A0AA);
+  static const Color sand = Color(0xFFF7F1E8);
+  static const Color paper = Color(0xFFF4F8FC);
+  static const Color surface = Colors.white;
+  static const Color border = Color(0xFFD9E2EC);
+  static const LinearGradient heroGradient = LinearGradient(
+    colors: <Color>[Color(0xFF102A43), Color(0xFF1E4E8C), Color(0xFF2F80ED)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+}
+
 class ScientificPaperReaderApp extends StatelessWidget {
   const ScientificPaperReaderApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    const seed = Color(0xFF1E4E8C);
-
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Scientific Paper Reader',
       theme: ThemeData(
         useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(seedColor: seed),
-        scaffoldBackgroundColor: const Color(0xFFF3F6F9),
+        colorScheme: const ColorScheme(
+          brightness: Brightness.light,
+          primary: AppColors.blue,
+          onPrimary: Colors.white,
+          secondary: AppColors.cyan,
+          onSecondary: Colors.white,
+          error: Color(0xFFB54747),
+          onError: Colors.white,
+          surface: AppColors.surface,
+          onSurface: AppColors.ink,
+        ),
+        scaffoldBackgroundColor: AppColors.paper,
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Colors.transparent,
+          foregroundColor: AppColors.ink,
+          elevation: 0,
+          centerTitle: false,
+        ),
+        textTheme: const TextTheme(
+          bodyMedium: TextStyle(color: AppColors.text),
+          bodySmall: TextStyle(color: AppColors.muted),
+        ),
       ),
       home: const MainReaderScreen(),
     );
@@ -226,12 +262,29 @@ class _MainReaderScreenState extends State<MainReaderScreen> {
       appBar: AppBar(
         title: const Text(
           'Scientific Paper Reader',
-          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 0.2,
+            color: Colors.white,
+            shadows: <Shadow>[
+              Shadow(
+                color: Color(0x66000000),
+                blurRadius: 6,
+                offset: Offset(0, 1),
+              ),
+            ],
+          ),
+        ),
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: AppColors.heroGradient,
+          ),
         ),
         actions: <Widget>[
           IconButton(
             onPressed: _fetchDocuments,
-            icon: const Icon(Icons.refresh_rounded),
+            icon: const Icon(Icons.refresh_rounded, color: Colors.white),
             tooltip: 'Refresh',
           ),
         ],
@@ -257,10 +310,11 @@ class _MainReaderScreenState extends State<MainReaderScreen> {
                   });
                 },
                 onUpload: () async {
+                  final messenger = ScaffoldMessenger.of(context);
                   try {
                     await _uploadPdf();
                     if (!mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(
+                    messenger.showSnackBar(
                       const SnackBar(
                         content: Text('PDF uploaded successfully'),
                         behavior: SnackBarBehavior.floating,
@@ -268,7 +322,7 @@ class _MainReaderScreenState extends State<MainReaderScreen> {
                     );
                   } catch (e) {
                     if (!mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(
+                    messenger.showSnackBar(
                       SnackBar(
                         content: Text('Upload failed: $e'),
                         behavior: SnackBarBehavior.floating,
@@ -372,27 +426,29 @@ class _Sidebar extends StatelessWidget {
     final bool hasSearch = searchQuery.trim().isNotEmpty;
 
     return Container(
-      color: Colors.white,
+      color: AppColors.surface,
       child: Column(
         children: <Widget>[
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: <Color>[Color(0xFF1E4E8C), Color(0xFF2E6AC0)],
-              ),
+              gradient: AppColors.heroGradient,
             ),
-            child: const Row(
-              children: <Widget>[
+            child: Row(
+              children: const <Widget>[
                 Icon(Icons.menu_book_rounded, color: Colors.white),
                 SizedBox(width: 10),
-                Text(
-                  'Documents & Topics',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
+                Expanded(
+                  child: Text(
+                    'Documents & Topics',
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
               ],
@@ -410,7 +466,7 @@ class _Sidebar extends StatelessWidget {
                     hintText: 'Search file name or topic...',
                     prefixIcon: const Icon(Icons.search_rounded),
                     filled: true,
-                    fillColor: const Color(0xFFF1F5FB),
+                    fillColor: const Color(0xFFF1F7FF),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(14),
                       borderSide: BorderSide.none,
@@ -422,13 +478,13 @@ class _Sidebar extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFEAF1FF),
+                      color: const Color(0xFFE8F4FF),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color(0xFFD6E3FA)),
+                      border: Border.all(color: const Color(0xFFB8D8FF)),
                     ),
                     child: Row(
                       children: <Widget>[
-                        const Icon(Icons.filter_alt_rounded, size: 18, color: Color(0xFF1E4E8C)),
+                        const Icon(Icons.filter_alt_rounded, size: 18, color: AppColors.sky),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
@@ -436,7 +492,7 @@ class _Sidebar extends StatelessWidget {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
-                              color: Color(0xFF14314F),
+                              color: AppColors.ink,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -456,7 +512,7 @@ class _Sidebar extends StatelessWidget {
                     icon: const Icon(Icons.upload_file_rounded, size: 18),
                     label: const Text('Upload PDF'),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF1E4E8C),
+                      backgroundColor: AppColors.blue,
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -482,7 +538,7 @@ class _Sidebar extends StatelessWidget {
                 return ExpansionTile(
                   initiallyExpanded: isExpanded,
                   collapsedBackgroundColor: Colors.white,
-                  backgroundColor: const Color(0xFFF7FAFF),
+                  backgroundColor: const Color(0xFFF0F7FF),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14),
                   ),
@@ -493,10 +549,10 @@ class _Sidebar extends StatelessWidget {
                     '$category (${items.length})',
                     style: const TextStyle(
                       fontWeight: FontWeight.w700,
-                      color: Color(0xFF1E4E8C),
+                      color: AppColors.blue,
                     ),
                   ),
-                  leading: const Icon(Icons.folder_rounded, color: Color(0xFF1E4E8C)),
+                  leading: const Icon(Icons.folder_rounded, color: AppColors.cyan),
                   onExpansionChanged: (expanded) {
                     if (expanded) onCategorySelected(category);
                   },
@@ -516,15 +572,15 @@ class _Sidebar extends StatelessWidget {
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                             child: Container(
                               decoration: BoxDecoration(
-                                color: selected ? const Color(0xFFDCE9FF) : Colors.white,
+                                color: selected ? const Color(0xFFDFF1FF) : Colors.white,
                                 borderRadius: BorderRadius.circular(10),
                                 border: Border.all(
-                                  color: selected ? const Color(0xFFB7D0FA) : const Color(0xFFE3EAF3),
+                                  color: selected ? const Color(0xFF99C9FF) : const Color(0xFFE3EAF3),
                                 ),
                               ),
                               child: ListTile(
                                 selected: selected,
-                                selectedTileColor: const Color(0xFFDCE9FF),
+                                selectedTileColor: const Color(0xFFDFF1FF),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(10),
                                 ),
@@ -532,12 +588,12 @@ class _Sidebar extends StatelessWidget {
                                   _isMarkdown(document.file)
                                       ? Icons.description_rounded
                                       : Icons.picture_as_pdf_rounded,
-                                  color: selected ? const Color(0xFF103A73) : const Color(0xFF1E4E8C),
+                                  color: selected ? AppColors.ink : AppColors.sky,
                                 ),
                                 title: _highlightedFileTitle(
                                   document.file,
                                   searchQuery,
-                                  selected ? const Color(0xFF103A73) : const Color(0xFF24364B),
+                                  selected ? AppColors.ink : const Color(0xFF24364B),
                                   selected ? FontWeight.w700 : FontWeight.w500,
                                 ),
                                 onTap: () => onFileSelected(document),
@@ -554,9 +610,9 @@ class _Sidebar extends StatelessWidget {
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: const BoxDecoration(
-                color: Color(0xFFF8FAFD),
+                color: Color(0xFFF7FAFD),
                 border: Border(
-                  top: BorderSide(color: Color(0xFFE2E9F3)),
+                  top: BorderSide(color: AppColors.border),
                 ),
               ),
               child: Text(
@@ -564,7 +620,7 @@ class _Sidebar extends StatelessWidget {
                     ? 'No matching documents found'
                     : 'Found $searchCount matching documents',
                 style: const TextStyle(
-                  color: Color(0xFF6C7B8D),
+                  color: AppColors.muted,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -638,12 +694,12 @@ class _ReaderCanvas extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            Icon(Icons.description_outlined, size: 88, color: Colors.grey.shade300),
+            Icon(Icons.description_outlined, size: 88, color: Colors.blueGrey.shade100),
             const SizedBox(height: 16),
             const Text(
               'Select a document in the left sidebar to start reading',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 16, color: Color(0xFF6C7B8D)),
+              style: TextStyle(fontSize: 16, color: AppColors.muted),
             ),
           ],
         ),
@@ -655,7 +711,7 @@ class _ReaderCanvas extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFDAE4F1)),
+        border: Border.all(color: AppColors.border),
         boxShadow: const <BoxShadow>[
           BoxShadow(
             color: Color(0x120D1F3D),
@@ -677,7 +733,7 @@ class _ReaderCanvas extends StatelessWidget {
                     style: const TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.w800,
-                      color: Color(0xFF14314F),
+                      color: AppColors.ink,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -698,10 +754,10 @@ class _ReaderCanvas extends StatelessWidget {
                               icon: const Icon(Icons.close_rounded),
                             ),
                       filled: true,
-                      fillColor: const Color(0xFFF8FAFD),
+                      fillColor: const Color(0xFFF8FBFF),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(14),
-                        borderSide: const BorderSide(color: Color(0xFFE2E9F3)),
+                        borderSide: const BorderSide(color: AppColors.border),
                       ),
                     ),
                   ),
@@ -723,13 +779,13 @@ class _ReaderCanvas extends StatelessWidget {
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFEAF1FF),
+                  color: const Color(0xFFE8F4FF),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFD6E3FA)),
+                  border: Border.all(color: const Color(0xFFB8D8FF)),
                 ),
                 child: Row(
                   children: <Widget>[
-                    const Icon(Icons.highlight_rounded, size: 18, color: Color(0xFF1E4E8C)),
+                    const Icon(Icons.highlight_rounded, size: 18, color: AppColors.sky),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -737,7 +793,7 @@ class _ReaderCanvas extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
-                          color: Color(0xFF14314F),
+                          color: AppColors.ink,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -778,9 +834,9 @@ class _ReaderCanvas extends StatelessWidget {
     if (selectedContent != null) {
       return Container(
         decoration: BoxDecoration(
-          color: const Color(0xFFF8FAFD),
+          color: const Color(0xFFF8FBFF),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFFE2E9F3)),
+          border: Border.all(color: AppColors.border),
         ),
         padding: const EdgeInsets.all(16),
         child: Markdown(
@@ -791,14 +847,14 @@ class _ReaderCanvas extends StatelessWidget {
     }
 
     return Center(
-      child: Column(
+        child: Column(
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
-          Icon(Icons.description_outlined, size: 88, color: Colors.grey.shade300),
+          Icon(Icons.description_outlined, size: 88, color: Colors.blueGrey.shade100),
           const SizedBox(height: 16),
           const Text(
             'This file could not be found in the workspace.',
-            style: TextStyle(fontSize: 16, color: Color(0xFF6C7B8D)),
+            style: TextStyle(fontSize: 16, color: AppColors.muted),
           ),
         ],
       ),
@@ -839,13 +895,13 @@ Widget _highlightedFileTitle(
     overflow: TextOverflow.ellipsis,
     text: TextSpan(
       style: TextStyle(color: color, fontWeight: weight, fontSize: 14),
-        children: <InlineSpan>[
+      children: <InlineSpan>[
         TextSpan(text: fileName.substring(0, index)),
         TextSpan(
           text: fileName.substring(index, index + trimmed.length),
           style: const TextStyle(
-            backgroundColor: Color(0xFFA9D6FF),
-            color: Color(0xFF14314F),
+            backgroundColor: Color(0xFFBDE0FE),
+            color: AppColors.ink,
             fontWeight: FontWeight.w800,
           ),
         ),

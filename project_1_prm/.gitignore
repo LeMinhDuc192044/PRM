@@ -4,6 +4,20 @@
 .pub/
 build/
 
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+env/
+.python-version
+pip-wheel-metadata/
+
 # Flutter generated
 .flutter-plugins
 .flutter-plugins-dependencies
@@ -59,3 +73,8 @@ obj/
 
 # Obsidian Vault
 ObsidianVault/
+
+# Local notes/data
+*.sqlite
+*.db
+*.log
