@@ -118,31 +118,36 @@ async def extract(
 
     authors = []
 
-    for author in soup.find_all("author"):
+# ONLY get authors from analytic section
+    analytic = soup.find("analytic")
 
-        pers_name = author.find("persName")
+    if analytic:
 
-        if pers_name:
+        for author in analytic.find_all("author"):
 
-            first = pers_name.find("forename")
-            last = pers_name.find("surname")
+            pers_name = author.find("persName")
 
-            first_name = (
-                first.text.strip()
-                if first else ""
-            )
+            if pers_name:
 
-            last_name = (
-                last.text.strip()
-                if last else ""
-            )
+                first = pers_name.find("forename")
+                last = pers_name.find("surname")
 
-            full_name = (
-                first_name + " " + last_name
-            ).strip()
+                first_name = (
+                    first.text.strip()
+                    if first else ""
+                )
 
-            if full_name:
-                authors.append(full_name)
+                last_name = (
+                    last.text.strip()
+                    if last else ""
+                )
+
+                full_name = (
+                    first_name + " " + last_name
+                ).strip()
+
+                if full_name:
+                    authors.append(full_name)
 
     # =========================
     # SECTIONS
@@ -163,9 +168,40 @@ async def extract(
             section_text = ""
 
             for p in paragraphs:
-                section_text += p.text.strip()
+
+                # Preserve formulas better
+                formula_tags = p.find_all("formula")
+
+                paragraph_text = p.get_text(
+                    " ",
+                    strip=True
+                )
+
+                # Replace formulas with LaTeX blocks
+                for formula in formula_tags:
+
+                    formula_text = formula.get_text(
+                        " ",
+                        strip=True
+                    )
+
+                    latex_block = (
+                        f"\n$$\n"
+                        f"{formula_text}\n"
+                        f"$$\n"
+                    )
+
+                    paragraph_text = (
+                        paragraph_text.replace(
+                            formula_text,
+                            latex_block
+                        )
+                    )
+
+                section_text += paragraph_text
                 section_text += "\n\n"
 
+            # OUTSIDE paragraph loop
             sections += f"# {section_title}\n\n"
             sections += section_text
             sections += "\n"
