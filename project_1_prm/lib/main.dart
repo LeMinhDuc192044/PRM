@@ -7,10 +7,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
+import 'package:project_1_prm/screens/notification_center_screen.dart';
 import 'package:project_1_prm/services/app_monitoring_service.dart';
 import 'package:project_1_prm/services/firebase_bootstrap_service.dart';
 import 'package:project_1_prm/viewmodels/auth_view_model.dart';
 import 'package:project_1_prm/viewmodels/export_view_model.dart';
+import 'package:project_1_prm/viewmodels/notification_view_model.dart';
 import 'package:project_1_prm/widgets/auth_action_button.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 
@@ -49,6 +51,9 @@ class ScientificPaperReaderApp extends StatelessWidget {
         ChangeNotifierProvider<AuthViewModel>(create: (_) => AuthViewModel()),
         ChangeNotifierProvider<ExportViewModel>(
           create: (_) => ExportViewModel(),
+        ),
+        ChangeNotifierProvider<NotificationViewModel>(
+          create: (_) => NotificationViewModel(),
         ),
       ],
       child: MaterialApp(
@@ -309,6 +314,28 @@ class _MainReaderScreenState extends State<MainReaderScreen> {
             onPressed: _fetchDocuments,
             icon: const Icon(Icons.refresh_rounded, color: Colors.white),
             tooltip: 'Refresh',
+          ),
+          Consumer<NotificationViewModel>(
+            builder: (context, viewModel, child) {
+              return IconButton(
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const NotificationCenterScreen(),
+                    ),
+                  );
+                },
+                icon: Badge.count(
+                  isLabelVisible: viewModel.unreadCount > 0,
+                  count: viewModel.unreadCount,
+                  child: const Icon(
+                    Icons.notifications_rounded,
+                    color: Colors.white,
+                  ),
+                ),
+                tooltip: 'Notifications',
+              );
+            },
           ),
           const AuthActionButton(),
         ],
