@@ -2,14 +2,16 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
 
-
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:http/http.dart' as http;
+import 'package:project_1_prm/services/firebase_bootstrap_service.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await FirebaseBootstrapService.initialize();
   runApp(const ScientificPaperReaderApp());
 }
 
@@ -73,10 +75,7 @@ class DocumentItem {
   final String category;
   final String file;
 
-  const DocumentItem({
-    required this.category,
-    required this.file,
-  });
+  const DocumentItem({required this.category, required this.file});
 
   factory DocumentItem.fromJson(Map<String, dynamic> json) {
     return DocumentItem(
@@ -102,7 +101,8 @@ class _MainReaderScreenState extends State<MainReaderScreen> {
   ];
 
   final TextEditingController _fileSearchController = TextEditingController();
-  final TextEditingController _contentSearchController = TextEditingController();
+  final TextEditingController _contentSearchController =
+      TextEditingController();
   final PdfViewerController _pdfController = PdfViewerController();
 
   List<DocumentItem> _documents = <DocumentItem>[];
@@ -203,12 +203,15 @@ class _MainReaderScreenState extends State<MainReaderScreen> {
   }
 
   Map<String, List<DocumentItem>> get _groupedDocuments {
-    final Map<String, List<DocumentItem>> grouped = <String, List<DocumentItem>>{
-      for (final category in categories) category: <DocumentItem>[],
-    };
+    final Map<String, List<DocumentItem>> grouped =
+        <String, List<DocumentItem>>{
+          for (final category in categories) category: <DocumentItem>[],
+        };
 
     for (final document in _filteredDocuments) {
-      grouped.putIfAbsent(document.category, () => <DocumentItem>[]).add(document);
+      grouped
+          .putIfAbsent(document.category, () => <DocumentItem>[])
+          .add(document);
     }
 
     return grouped;
@@ -252,7 +255,10 @@ class _MainReaderScreenState extends State<MainReaderScreen> {
   }
 
   int get _filteredCount {
-    return _groupedDocuments.values.fold<int>(0, (sum, list) => sum + list.length);
+    return _groupedDocuments.values.fold<int>(
+      0,
+      (sum, list) => sum + list.length,
+    );
   }
 
   @override
@@ -278,9 +284,7 @@ class _MainReaderScreenState extends State<MainReaderScreen> {
           ),
         ),
         flexibleSpace: Container(
-          decoration: const BoxDecoration(
-            gradient: AppColors.heroGradient,
-          ),
+          decoration: const BoxDecoration(gradient: AppColors.heroGradient),
         ),
         actions: <Widget>[
           IconButton(
@@ -348,7 +352,10 @@ class _MainReaderScreenState extends State<MainReaderScreen> {
             _SplitHandle(
               onDrag: (delta) {
                 setState(() {
-                  _sidebarWidth = (_sidebarWidth + delta).clamp(300.0, math.max(420.0, screenWidth * 0.42));
+                  _sidebarWidth = (_sidebarWidth + delta).clamp(
+                    300.0,
+                    math.max(420.0, screenWidth * 0.42),
+                  );
                 });
               },
             ),
@@ -433,9 +440,7 @@ class _Sidebar extends StatelessWidget {
           Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            decoration: const BoxDecoration(
-              gradient: AppColors.heroGradient,
-            ),
+            decoration: const BoxDecoration(gradient: AppColors.heroGradient),
             child: Row(
               children: const <Widget>[
                 Icon(Icons.menu_book_rounded, color: Colors.white),
@@ -477,7 +482,10 @@ class _Sidebar extends StatelessWidget {
                 const SizedBox(height: 12),
                 if (hasSearch)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFFE8F4FF),
                       borderRadius: BorderRadius.circular(12),
@@ -485,7 +493,11 @@ class _Sidebar extends StatelessWidget {
                     ),
                     child: Row(
                       children: <Widget>[
-                        const Icon(Icons.filter_alt_rounded, size: 18, color: AppColors.sky),
+                        const Icon(
+                          Icons.filter_alt_rounded,
+                          size: 18,
+                          color: AppColors.sky,
+                        ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
@@ -528,82 +540,105 @@ class _Sidebar extends StatelessWidget {
           Expanded(
             child: ListView(
               padding: const EdgeInsets.all(12),
-              children: categories.map((category) {
-                final items = groupedDocuments[category] ?? <DocumentItem>[];
-                final isExpanded = hasSearch ? items.isNotEmpty : selectedCategory == category;
+              children: categories
+                  .map((category) {
+                    final items =
+                        groupedDocuments[category] ?? <DocumentItem>[];
+                    final isExpanded = hasSearch
+                        ? items.isNotEmpty
+                        : selectedCategory == category;
 
-                if (hasSearch && items.isEmpty) {
-                  return const SizedBox.shrink();
-                }
+                    if (hasSearch && items.isEmpty) {
+                      return const SizedBox.shrink();
+                    }
 
-                return ExpansionTile(
-                  initiallyExpanded: isExpanded,
-                  collapsedBackgroundColor: Colors.white,
-                  backgroundColor: const Color(0xFFF0F7FF),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  collapsedShape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  title: Text(
-                    '$category (${items.length})',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.blue,
-                    ),
-                  ),
-                  leading: const Icon(Icons.folder_rounded, color: AppColors.cyan),
-                  onExpansionChanged: (expanded) {
-                    if (expanded) onCategorySelected(category);
-                  },
-                  children: items.isEmpty
-                      ? <Widget>[
-                          const ListTile(
-                            dense: true,
-                            title: Text(
-                              'No documents',
-                              style: TextStyle(color: Color(0xFF6C7B8D)),
-                            ),
-                          ),
-                        ]
-                      : items.map((document) {
-                          final bool selected = document.file == selectedFile;
-                          return Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: selected ? const Color(0xFFDFF1FF) : Colors.white,
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(
-                                  color: selected ? const Color(0xFF99C9FF) : const Color(0xFFE3EAF3),
+                    return ExpansionTile(
+                      initiallyExpanded: isExpanded,
+                      collapsedBackgroundColor: Colors.white,
+                      backgroundColor: const Color(0xFFF0F7FF),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      collapsedShape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      title: Text(
+                        '$category (${items.length})',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.blue,
+                        ),
+                      ),
+                      leading: const Icon(
+                        Icons.folder_rounded,
+                        color: AppColors.cyan,
+                      ),
+                      onExpansionChanged: (expanded) {
+                        if (expanded) onCategorySelected(category);
+                      },
+                      children: items.isEmpty
+                          ? <Widget>[
+                              const ListTile(
+                                dense: true,
+                                title: Text(
+                                  'No documents',
+                                  style: TextStyle(color: Color(0xFF6C7B8D)),
                                 ),
                               ),
-                              child: ListTile(
-                                selected: selected,
-                                selectedTileColor: const Color(0xFFDFF1FF),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10),
+                            ]
+                          : items.map((document) {
+                              final bool selected =
+                                  document.file == selectedFile;
+                              return Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
                                 ),
-                                leading: Icon(
-                                  _isMarkdown(document.file)
-                                      ? Icons.description_rounded
-                                      : Icons.picture_as_pdf_rounded,
-                                  color: selected ? AppColors.ink : AppColors.sky,
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    color: selected
+                                        ? const Color(0xFFDFF1FF)
+                                        : Colors.white,
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(
+                                      color: selected
+                                          ? const Color(0xFF99C9FF)
+                                          : const Color(0xFFE3EAF3),
+                                    ),
+                                  ),
+                                  child: ListTile(
+                                    selected: selected,
+                                    selectedTileColor: const Color(0xFFDFF1FF),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    leading: Icon(
+                                      _isMarkdown(document.file)
+                                          ? Icons.description_rounded
+                                          : Icons.picture_as_pdf_rounded,
+                                      color: selected
+                                          ? AppColors.ink
+                                          : AppColors.sky,
+                                    ),
+                                    title: _highlightedFileTitle(
+                                      document.file,
+                                      searchQuery,
+                                      selected
+                                          ? AppColors.ink
+                                          : const Color(0xFF24364B),
+                                      selected
+                                          ? FontWeight.w700
+                                          : FontWeight.w500,
+                                    ),
+                                    onTap: () => onFileSelected(document),
+                                  ),
                                 ),
-                                title: _highlightedFileTitle(
-                                  document.file,
-                                  searchQuery,
-                                  selected ? AppColors.ink : const Color(0xFF24364B),
-                                  selected ? FontWeight.w700 : FontWeight.w500,
-                                ),
-                                onTap: () => onFileSelected(document),
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                );
-              }).whereType<Widget>().toList(),
+                              );
+                            }).toList(),
+                    );
+                  })
+                  .whereType<Widget>()
+                  .toList(),
             ),
           ),
           if (hasSearch)
@@ -612,9 +647,7 @@ class _Sidebar extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: const BoxDecoration(
                 color: Color(0xFFF7FAFD),
-                border: Border(
-                  top: BorderSide(color: AppColors.border),
-                ),
+                border: Border(top: BorderSide(color: AppColors.border)),
               ),
               child: Text(
                 searchCount == 0
@@ -676,14 +709,15 @@ class _ReaderCanvas extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              const Icon(Icons.cloud_off_rounded, size: 48, color: Color(0xFFB54747)),
+              const Icon(
+                Icons.cloud_off_rounded,
+                size: 48,
+                color: Color(0xFFB54747),
+              ),
               const SizedBox(height: 12),
               Text(errorMessage!, textAlign: TextAlign.center),
               const SizedBox(height: 16),
-              FilledButton(
-                onPressed: onRetry,
-                child: const Text('Retry'),
-              ),
+              FilledButton(onPressed: onRetry, child: const Text('Retry')),
             ],
           ),
         ),
@@ -695,7 +729,11 @@ class _ReaderCanvas extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            Icon(Icons.description_outlined, size: 88, color: Colors.blueGrey.shade100),
+            Icon(
+              Icons.description_outlined,
+              size: 88,
+              color: Colors.blueGrey.shade100,
+            ),
             const SizedBox(height: 16),
             const Text(
               'Select a document in the left sidebar to start reading',
@@ -778,7 +816,10 @@ class _ReaderCanvas extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
                 decoration: BoxDecoration(
                   color: const Color(0xFFE8F4FF),
                   borderRadius: BorderRadius.circular(12),
@@ -786,7 +827,11 @@ class _ReaderCanvas extends StatelessWidget {
                 ),
                 child: Row(
                   children: <Widget>[
-                    const Icon(Icons.highlight_rounded, size: 18, color: AppColors.sky),
+                    const Icon(
+                      Icons.highlight_rounded,
+                      size: 18,
+                      color: AppColors.sky,
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -820,7 +865,9 @@ class _ReaderCanvas extends StatelessWidget {
   }
 
   Widget _buildViewer() {
-    if (selectedKind == 'pdf' && selectedPath != null && File(selectedPath!).existsSync()) {
+    if (selectedKind == 'pdf' &&
+        selectedPath != null &&
+        File(selectedPath!).existsSync()) {
       return ClipRRect(
         borderRadius: BorderRadius.circular(16),
         child: SfPdfViewer.file(
@@ -840,18 +887,19 @@ class _ReaderCanvas extends StatelessWidget {
           border: Border.all(color: AppColors.border),
         ),
         padding: const EdgeInsets.all(16),
-        child: Markdown(
-          data: selectedContent!,
-          selectable: true,
-        ),
+        child: Markdown(data: selectedContent!, selectable: true),
       );
     }
 
     return Center(
-        child: Column(
+      child: Column(
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
-          Icon(Icons.description_outlined, size: 88, color: Colors.blueGrey.shade100),
+          Icon(
+            Icons.description_outlined,
+            size: 88,
+            color: Colors.blueGrey.shade100,
+          ),
           const SizedBox(height: 16),
           const Text(
             'This file could not be found in the workspace.',
