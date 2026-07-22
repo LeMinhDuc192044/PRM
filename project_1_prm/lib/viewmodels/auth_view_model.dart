@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
+import 'package:project_1_prm/services/app_monitoring_service.dart';
 import 'package:project_1_prm/services/auth_service.dart';
 
 class AuthViewModel extends ChangeNotifier {
@@ -27,11 +28,17 @@ class AuthViewModel extends ChangeNotifier {
   String? get errorMessage => _errorMessage;
 
   Future<void> signInWithGoogle() async {
-    await _runAuthAction(_authService.signInWithGoogle);
+    await _runAuthAction(() async {
+      await _authService.signInWithGoogle();
+      await AppMonitoringService.logLogin(method: 'google');
+    });
   }
 
   Future<void> signOut() async {
-    await _runAuthAction(_authService.signOut);
+    await _runAuthAction(() async {
+      await _authService.signOut();
+      await AppMonitoringService.logSignOut();
+    });
   }
 
   void clearError() {
@@ -46,7 +53,8 @@ class AuthViewModel extends ChangeNotifier {
 
     try {
       await action();
-    } catch (error) {
+    } catch (error, stackTrace) {
+      await AppMonitoringService.recordError(error, stackTrace);
       _errorMessage = error.toString();
     } finally {
       _isLoading = false;

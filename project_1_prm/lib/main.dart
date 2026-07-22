@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
+import 'package:project_1_prm/services/app_monitoring_service.dart';
 import 'package:project_1_prm/services/firebase_bootstrap_service.dart';
 import 'package:project_1_prm/viewmodels/auth_view_model.dart';
 import 'package:project_1_prm/widgets/auth_action_button.dart';
@@ -15,6 +16,7 @@ import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await FirebaseBootstrapService.initialize();
+  await AppMonitoringService.initialize();
   runApp(const ScientificPaperReaderApp());
 }
 
@@ -71,6 +73,10 @@ class ScientificPaperReaderApp extends StatelessWidget {
             bodySmall: TextStyle(color: AppColors.muted),
           ),
         ),
+        navigatorObservers: <NavigatorObserver>[
+          if (AppMonitoringService.navigatorObserver != null)
+            AppMonitoringService.navigatorObserver!,
+        ],
         home: const MainReaderScreen(),
       ),
     );
