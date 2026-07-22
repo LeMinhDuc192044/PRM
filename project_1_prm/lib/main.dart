@@ -10,6 +10,7 @@ import 'package:provider/provider.dart';
 import 'package:project_1_prm/services/app_monitoring_service.dart';
 import 'package:project_1_prm/services/firebase_bootstrap_service.dart';
 import 'package:project_1_prm/viewmodels/auth_view_model.dart';
+import 'package:project_1_prm/viewmodels/export_view_model.dart';
 import 'package:project_1_prm/widgets/auth_action_button.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 
@@ -43,8 +44,13 @@ class ScientificPaperReaderApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider<AuthViewModel>(
-      create: (_) => AuthViewModel(),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider<AuthViewModel>(create: (_) => AuthViewModel()),
+        ChangeNotifierProvider<ExportViewModel>(
+          create: (_) => ExportViewModel(),
+        ),
+      ],
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
         title: 'Scientific Paper Reader',
@@ -402,6 +408,7 @@ class _MainReaderScreenState extends State<MainReaderScreen> {
                 pdfController: _pdfController,
                 onClearSelection: _clearSelection,
                 onRetry: _fetchDocuments,
+                selectedCategory: _selectedCategory,
               ),
             ),
           ],
@@ -692,6 +699,7 @@ class _ReaderCanvas extends StatelessWidget {
   final PdfViewerController pdfController;
   final VoidCallback onClearSelection;
   final VoidCallback onRetry;
+  final String? selectedCategory;
 
   const _ReaderCanvas({
     required this.isLoading,
@@ -707,10 +715,13 @@ class _ReaderCanvas extends StatelessWidget {
     required this.pdfController,
     required this.onClearSelection,
     required this.onRetry,
+    required this.selectedCategory,
   });
 
   @override
   Widget build(BuildContext context) {
+    _handleExportFeedback(context);
+
     if (isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -820,6 +831,13 @@ class _ReaderCanvas extends StatelessWidget {
                   icon: const Icon(Icons.close_rounded),
                   tooltip: 'Close document',
                 ),
+                const SizedBox(width: 4),
+                _ExportDocumentButton(
+                  title: selectedFile,
+                  category: selectedCategory,
+                  content: selectedContent,
+                  sourcePath: selectedPath,
+                ),
               ],
             ),
           ),
@@ -920,6 +938,83 @@ class _ReaderCanvas extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+
+  void _handleExportFeedback(BuildContext context) {
+    final exportViewModel = context.watch<ExportViewModel>();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!context.mounted) return;
+
+      final messenger = ScaffoldMessenger.of(context);
+      if (exportViewModel.errorMessage != null) {
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(exportViewModel.errorMessage!),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        exportViewModel.clearMessages();
+        return;
+      }
+
+      final result = exportViewModel.lastResult;
+      if (result == null) return;
+
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            result.downloadUrl == null
+                ? 'PDF exported to ${result.file.path}'
+                : 'PDF exported and uploaded successfully',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      exportViewModel.clearMessages();
+    });
+  }
+}
+
+class _ExportDocumentButton extends StatelessWidget {
+  const _ExportDocumentButton({
+    required this.title,
+    required this.category,
+    required this.content,
+    required this.sourcePath,
+  });
+
+  final String? title;
+  final String? category;
+  final String? content;
+  final String? sourcePath;
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<ExportViewModel>(
+      builder: (context, viewModel, child) {
+        return IconButton(
+          onPressed: title == null || category == null || viewModel.isExporting
+              ? null
+              : () {
+                  viewModel.exportDocument(
+                    title: title!,
+                    category: category!,
+                    body: content,
+                    sourcePath: sourcePath,
+                  );
+                },
+          icon: viewModel.isExporting
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.picture_as_pdf_rounded),
+          tooltip: 'Export PDF',
+        );
+      },
     );
   }
 }
