@@ -6,7 +6,10 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:http/http.dart' as http;
+import 'package:provider/provider.dart';
 import 'package:project_1_prm/services/firebase_bootstrap_service.dart';
+import 'package:project_1_prm/viewmodels/auth_view_model.dart';
+import 'package:project_1_prm/widgets/auth_action_button.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 
 Future<void> main() async {
@@ -38,35 +41,38 @@ class ScientificPaperReaderApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'Scientific Paper Reader',
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: const ColorScheme(
-          brightness: Brightness.light,
-          primary: AppColors.blue,
-          onPrimary: Colors.white,
-          secondary: AppColors.cyan,
-          onSecondary: Colors.white,
-          error: Color(0xFFB54747),
-          onError: Colors.white,
-          surface: AppColors.surface,
-          onSurface: AppColors.ink,
+    return ChangeNotifierProvider<AuthViewModel>(
+      create: (_) => AuthViewModel(),
+      child: MaterialApp(
+        debugShowCheckedModeBanner: false,
+        title: 'Scientific Paper Reader',
+        theme: ThemeData(
+          useMaterial3: true,
+          colorScheme: const ColorScheme(
+            brightness: Brightness.light,
+            primary: AppColors.blue,
+            onPrimary: Colors.white,
+            secondary: AppColors.cyan,
+            onSecondary: Colors.white,
+            error: Color(0xFFB54747),
+            onError: Colors.white,
+            surface: AppColors.surface,
+            onSurface: AppColors.ink,
+          ),
+          scaffoldBackgroundColor: AppColors.paper,
+          appBarTheme: const AppBarTheme(
+            backgroundColor: Colors.transparent,
+            foregroundColor: AppColors.ink,
+            elevation: 0,
+            centerTitle: false,
+          ),
+          textTheme: const TextTheme(
+            bodyMedium: TextStyle(color: AppColors.text),
+            bodySmall: TextStyle(color: AppColors.muted),
+          ),
         ),
-        scaffoldBackgroundColor: AppColors.paper,
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.transparent,
-          foregroundColor: AppColors.ink,
-          elevation: 0,
-          centerTitle: false,
-        ),
-        textTheme: const TextTheme(
-          bodyMedium: TextStyle(color: AppColors.text),
-          bodySmall: TextStyle(color: AppColors.muted),
-        ),
+        home: const MainReaderScreen(),
       ),
-      home: const MainReaderScreen(),
     );
   }
 }
@@ -292,6 +298,7 @@ class _MainReaderScreenState extends State<MainReaderScreen> {
             icon: const Icon(Icons.refresh_rounded, color: Colors.white),
             tooltip: 'Refresh',
           ),
+          const AuthActionButton(),
         ],
       ),
       body: SizedBox(
