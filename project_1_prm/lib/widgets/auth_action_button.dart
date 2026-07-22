@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:project_1_prm/screens/profile_screen.dart';
 import 'package:project_1_prm/viewmodels/auth_view_model.dart';
 
 class AuthActionButton extends StatelessWidget {
@@ -49,6 +50,11 @@ class AuthActionButton extends StatelessWidget {
         return PopupMenuButton<String>(
           tooltip: 'Account',
           onSelected: (value) {
+            if (value == 'profile') {
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(builder: (_) => const ProfileScreen()),
+              );
+            }
             if (value == 'sign_out') {
               viewModel.signOut();
             }
@@ -60,6 +66,10 @@ class AuthActionButton extends StatelessWidget {
                 child: Text(user?.email ?? 'Signed in'),
               ),
               const PopupMenuDivider(),
+              const PopupMenuItem<String>(
+                value: 'profile',
+                child: Text('Profile'),
+              ),
               const PopupMenuItem<String>(
                 value: 'sign_out',
                 child: Text('Sign out'),
