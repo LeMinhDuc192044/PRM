@@ -1,5 +1,6 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
+import 'package:project_1_prm/firebase_options.dart';
 
 class FirebaseBootstrapService {
   const FirebaseBootstrapService._();
@@ -8,7 +9,9 @@ class FirebaseBootstrapService {
 
   static Future<void> initialize() async {
     try {
-      await Firebase.initializeApp();
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
       isInitialized = true;
     } catch (error, stackTrace) {
       isInitialized = false;

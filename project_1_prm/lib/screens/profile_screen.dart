@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:project_1_prm/viewmodels/auth_view_model.dart';
+import 'package:project_1_prm/viewmodels/remote_config_view_model.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -16,10 +17,16 @@ class ProfileScreen extends StatelessWidget {
           }
 
           final user = viewModel.user;
+          final remoteConfig = context.watch<RemoteConfigViewModel>();
 
           return ListView(
             padding: const EdgeInsets.all(24),
             children: <Widget>[
+              _RemoteConfigProfileCard(
+                message: remoteConfig.values.welcomeMessage,
+                exportEnabled: remoteConfig.values.enablePdfExport,
+              ),
+              const SizedBox(height: 24),
               Center(
                 child: CircleAvatar(
                   radius: 52,
@@ -78,6 +85,41 @@ class ProfileScreen extends StatelessWidget {
             ],
           );
         },
+      ),
+    );
+  }
+}
+
+class _RemoteConfigProfileCard extends StatelessWidget {
+  const _RemoteConfigProfileCard({
+    required this.message,
+    required this.exportEnabled,
+  });
+
+  final String message;
+  final bool exportEnabled;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      elevation: 0,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text(
+              'Remote Config',
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 8),
+            Text(message),
+            const SizedBox(height: 8),
+            Text('PDF export: ${exportEnabled ? 'Enabled' : 'Disabled'}'),
+          ],
+        ),
       ),
     );
   }

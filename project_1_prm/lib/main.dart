@@ -13,6 +13,7 @@ import 'package:project_1_prm/services/firebase_bootstrap_service.dart';
 import 'package:project_1_prm/viewmodels/auth_view_model.dart';
 import 'package:project_1_prm/viewmodels/export_view_model.dart';
 import 'package:project_1_prm/viewmodels/notification_view_model.dart';
+import 'package:project_1_prm/viewmodels/remote_config_view_model.dart';
 import 'package:project_1_prm/widgets/auth_action_button.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 
@@ -55,41 +56,76 @@ class ScientificPaperReaderApp extends StatelessWidget {
         ChangeNotifierProvider<NotificationViewModel>(
           create: (_) => NotificationViewModel(),
         ),
-      ],
-      child: MaterialApp(
-        debugShowCheckedModeBanner: false,
-        title: 'Scientific Paper Reader',
-        theme: ThemeData(
-          useMaterial3: true,
-          colorScheme: const ColorScheme(
-            brightness: Brightness.light,
-            primary: AppColors.blue,
-            onPrimary: Colors.white,
-            secondary: AppColors.cyan,
-            onSecondary: Colors.white,
-            error: Color(0xFFB54747),
-            onError: Colors.white,
-            surface: AppColors.surface,
-            onSurface: AppColors.ink,
-          ),
-          scaffoldBackgroundColor: AppColors.paper,
-          appBarTheme: const AppBarTheme(
-            backgroundColor: Colors.transparent,
-            foregroundColor: AppColors.ink,
-            elevation: 0,
-            centerTitle: false,
-          ),
-          textTheme: const TextTheme(
-            bodyMedium: TextStyle(color: AppColors.text),
-            bodySmall: TextStyle(color: AppColors.muted),
-          ),
+        ChangeNotifierProvider<RemoteConfigViewModel>(
+          create: (_) => RemoteConfigViewModel(),
         ),
-        navigatorObservers: <NavigatorObserver>[
-          if (AppMonitoringService.navigatorObserver != null)
-            AppMonitoringService.navigatorObserver!,
-        ],
-        home: const MainReaderScreen(),
+      ],
+      child: Consumer<RemoteConfigViewModel>(
+        builder: (context, remoteConfigViewModel, child) {
+          return MaterialApp(
+            debugShowCheckedModeBanner: false,
+            title: remoteConfigViewModel.values.appTitle,
+            theme: ThemeData(
+              useMaterial3: true,
+              colorScheme: const ColorScheme(
+                brightness: Brightness.light,
+                primary: AppColors.blue,
+                onPrimary: Colors.white,
+                secondary: AppColors.cyan,
+                onSecondary: Colors.white,
+                error: Color(0xFFB54747),
+                onError: Colors.white,
+                surface: AppColors.surface,
+                onSurface: AppColors.ink,
+              ),
+              scaffoldBackgroundColor: AppColors.paper,
+              appBarTheme: const AppBarTheme(
+                backgroundColor: Colors.transparent,
+                foregroundColor: AppColors.ink,
+                elevation: 0,
+                centerTitle: false,
+              ),
+              textTheme: const TextTheme(
+                bodyMedium: TextStyle(color: AppColors.text),
+                bodySmall: TextStyle(color: AppColors.muted),
+              ),
+            ),
+            navigatorObservers: <NavigatorObserver>[
+              if (AppMonitoringService.navigatorObserver != null)
+                AppMonitoringService.navigatorObserver!,
+            ],
+            home: const MainReaderScreen(),
+          );
+        },
       ),
+    );
+  }
+}
+
+class _ConfiguredAppTitle extends StatelessWidget {
+  const _ConfiguredAppTitle();
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<RemoteConfigViewModel>(
+      builder: (context, viewModel, child) {
+        return Text(
+          viewModel.values.appTitle,
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 0.2,
+            color: Colors.white,
+            shadows: <Shadow>[
+              Shadow(
+                color: Color(0x66000000),
+                blurRadius: 6,
+                offset: Offset(0, 1),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
@@ -290,22 +326,7 @@ class _MainReaderScreenState extends State<MainReaderScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'Scientific Paper Reader',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 0.2,
-            color: Colors.white,
-            shadows: <Shadow>[
-              Shadow(
-                color: Color(0x66000000),
-                blurRadius: 6,
-                offset: Offset(0, 1),
-              ),
-            ],
-          ),
-        ),
+        title: const _ConfiguredAppTitle(),
         flexibleSpace: Container(
           decoration: const BoxDecoration(gradient: AppColors.heroGradient),
         ),
@@ -1021,8 +1042,15 @@ class _ExportDocumentButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Consumer<ExportViewModel>(
       builder: (context, viewModel, child) {
+        final remoteConfig = context.watch<RemoteConfigViewModel>();
+        final exportEnabled = remoteConfig.values.enablePdfExport;
+
         return IconButton(
-          onPressed: title == null || category == null || viewModel.isExporting
+          onPressed:
+              title == null ||
+                  category == null ||
+                  viewModel.isExporting ||
+                  !exportEnabled
               ? null
               : () {
                   viewModel.exportDocument(
@@ -1039,7 +1067,7 @@ class _ExportDocumentButton extends StatelessWidget {
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
               : const Icon(Icons.picture_as_pdf_rounded),
-          tooltip: 'Export PDF',
+          tooltip: exportEnabled ? 'Export PDF' : 'PDF export disabled',
         );
       },
     );

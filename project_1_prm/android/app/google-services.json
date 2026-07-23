@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "243278746903",
+    "project_id": "journal-trend-anaylyzr-project",
+    "storage_bucket": "journal-trend-anaylyzr-project.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:243278746903:android:67b08c99c5603356d49352",
+        "android_client_info": {
+          "package_name": "com.example.project_1_prm"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDTCcIDy3X92o_aLHqaPzLfBeBCWrjkDmY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

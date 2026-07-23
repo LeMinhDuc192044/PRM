@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/foundation.dart';
@@ -10,6 +12,16 @@ class AppMonitoringService {
   static FirebaseCrashlytics? _crashlytics;
 
   static bool get isEnabled => FirebaseBootstrapService.isInitialized;
+  static bool get _isAnalyticsSupported =>
+      kIsWeb ||
+      defaultTargetPlatform == TargetPlatform.android ||
+      defaultTargetPlatform == TargetPlatform.iOS ||
+      defaultTargetPlatform == TargetPlatform.macOS;
+  static bool get _isCrashlyticsSupported =>
+      !kIsWeb &&
+      (defaultTargetPlatform == TargetPlatform.android ||
+          defaultTargetPlatform == TargetPlatform.iOS ||
+          defaultTargetPlatform == TargetPlatform.macOS);
 
   static FirebaseAnalyticsObserver? get navigatorObserver {
     final analytics = _analytics;
@@ -20,20 +32,30 @@ class AppMonitoringService {
   static Future<void> initialize() async {
     if (!isEnabled) return;
 
-    _analytics = FirebaseAnalytics.instance;
+    if (_isAnalyticsSupported) {
+      _analytics = FirebaseAnalytics.instance;
+      await _analytics?.logAppOpen();
+    }
+
+    if (!_isCrashlyticsSupported) return;
+
     _crashlytics = FirebaseCrashlytics.instance;
 
     FlutterError.onError = (details) {
       FlutterError.presentError(details);
-      _crashlytics?.recordFlutterFatalError(details);
+      final crashlytics = _crashlytics;
+      if (crashlytics != null) {
+        unawaited(crashlytics.recordFlutterFatalError(details));
+      }
     };
 
     PlatformDispatcher.instance.onError = (error, stackTrace) {
-      _crashlytics?.recordError(error, stackTrace, fatal: true);
+      final crashlytics = _crashlytics;
+      if (crashlytics != null) {
+        unawaited(crashlytics.recordError(error, stackTrace, fatal: true));
+      }
       return true;
     };
-
-    await _analytics?.logAppOpen();
   }
 
   static Future<void> logLogin({required String method}) async {
@@ -51,7 +73,7 @@ class AppMonitoringService {
     StackTrace stackTrace, {
     bool fatal = false,
   }) async {
-    if (!isEnabled) return;
+    if (!isEnabled || !_isCrashlyticsSupported) return;
     await _crashlytics?.recordError(error, stackTrace, fatal: fatal);
   }
 }

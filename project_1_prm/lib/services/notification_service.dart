@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 import 'package:project_1_prm/models/app_notification.dart';
 import 'package:project_1_prm/services/firebase_bootstrap_service.dart';
 
@@ -19,7 +20,13 @@ class NotificationService {
 
   final FirebaseMessaging? _messaging;
 
-  bool get isAvailable => FirebaseBootstrapService.isInitialized;
+  bool get _isMessagingSupported =>
+      kIsWeb ||
+      defaultTargetPlatform == TargetPlatform.android ||
+      defaultTargetPlatform == TargetPlatform.iOS ||
+      defaultTargetPlatform == TargetPlatform.macOS;
+  bool get isAvailable =>
+      FirebaseBootstrapService.isInitialized && _isMessagingSupported;
 
   FirebaseMessaging get _instance {
     if (!isAvailable) {

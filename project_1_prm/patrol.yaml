@@ -1,0 +1,5 @@
+app_name: Scientific Paper Reader
+android:
+  package_name: com.example.project_1_prm
+ios:
+  bundle_id: com.example.project1Prm
